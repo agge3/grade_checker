@@ -1,6 +1,12 @@
 # Grade Checker
 
 ## Usage
+Setup:
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 To run all tests:
 ```bash
 python -m tests.<type_of_test>.run  # General
