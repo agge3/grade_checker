@@ -1,0 +1,28 @@
+from tools import util
+from core.shell import Shell
+
+from tests.unit import shell_unit
+
+import unittest
+from unittest.mock import patch, MagicMock
+
+
+def tests():
+    util.is_windows()
+    shell = Shell()
+
+
+def main():
+    suite = unittest.TestSuite()
+    
+    # Explicitly add tests from imported modules.
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(shell_unit))
+
+    # Run test suite.
+    runner = unittest.TextTestRunner(verbosity=2)
+    runner.run(suite)
+
+
+if __name__ == "__main__":
+    tests()
+    main()

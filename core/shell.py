@@ -1,16 +1,22 @@
+from tools import util
+
+import os
+import subprocess
+import shutil
+import sys
+
+
 class Shell:
     def __init__(self):
         self._os = os.name
         self._bash = self._get_bash_path()
         self._check_dep()
 
-
     def _get_bash_path(self):
         """ Find the appropriate bash executable depending on the OS. """
-        if _is_windows():
+        if util.is_windows():
             return self._get_git_bash_path()
         return "/usr/bin/env bash"
-
 
     def _get_git_bash_path(self):
         """ Find Git Bash executable on Windows. """
@@ -22,7 +28,6 @@ class Shell:
             if os.path.isfile(path):
                 return path
         raise FileNotFoundError("Git Bash not found. Please install Git Bash.")
-
 
     def _check_dep(self):
         """
@@ -40,13 +45,12 @@ class Shell:
             print("Error: `grep` command not found.")
             sys.exit(1)
 
-
     def cmd(self, cmd):
         """
         Run a shell command.
         On Windows, use Git Bash if specified; otherwise, run normally.
         """
-        if _is_windows():
+        if util.is_windows():
             # Wrap the command for Git Bash compatibility.
             # xxx why do we need to join here?
             bash_cmd = ' '.join(cmd)

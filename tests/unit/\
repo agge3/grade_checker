@@ -1,0 +1,17 @@
+from tools import util
+from core.shell import Shell
+
+from tests.unit import shell_unit
+
+import unittest
+from unittest.mock import patch, MagicMock
+
+
+def tests():
+    util.is_windows()
+    shell = Shell()
+
+
+if __name__ == "__main__":
+    tests()
+    unittest.main()
