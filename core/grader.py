@@ -1,0 +1,216 @@
+class Grader:
+    def __init__(self, shell, clazz):
+        self.shell = shell
+        self.clazz = clazz
+        self.files = self._get_files()
+        if not _check_files(self.files):
+            print(f"Grader was unable to find files: {self.files}. Exiting...")
+            sys.exit(1)
+
+    def _get_files(self):
+        files = {
+            "hpp" : [],
+            "cpp" : []
+        }
+
+        words = _split_clazz_name(self.clazz)
+        args = ' '.join(words)
+
+        # Run the shell scripts to find `.hpp` and `.cpp` files.
+        for ext in ["hpp", "cpp"]:
+            stdout, stderr, code = self.shell.cmd(f"./find_{ext}.sh {args}")
+            if stdout.strip():  # Only add if there are results.
+                files[ext] = stdout.strip().splitlines()
+
+        return files
+
+
+    """Check for the presence of functions in the class header and definition files."""
+    def check_func(self):
+        # xxx read in, maybe from json
+        func_hpp = {
+            f"class {self.clazz} {{" : False,
+            "HashNode** getTable(" : False,
+            "int getSize(" : False,
+            "bool isEmpty(" : False,
+            "int getNumberOfItems(" : False,
+            "bool add(" : False,
+            "bool remove(" : False,
+            "void clear(" : False,
+            "HashNode* getItem(" : False,
+            "bool contains(" : False,
+        }
+
+        func_comments = func_hpp.copy()
+
+        func_cpp = {
+            k.split(' ', 1)[0] + f" {self.clazz}::{k.split(' ', 1)[1]}" : v
+            for k, v in func_hpp.items()
+        }
+
+        # Check the `.hpp` file for function declarations and method headers.
+        processor = FileProcessor(self.files["hpp"], 'r')
+        for fh in processor:
+            lines = fh.readlines()
+            for idx, line in enumerate(lines):
+                for fn, visited in func_hpp.items():
+                    if visited:
+                        continue
+                    if fn in line:
+                        func_hpp[fn] = True
+                        if "*/" in lines[idx - 1] or "//" in lines[idx - 1]:
+                            func_comments[fn] = True
+
+        # Check the `.cpp` file for function definitions.
+        processor = FileProcessor(self.files["cpp"], 'r')
+        for fh in processor:
+            buf = fh.read()
+            for fn, visited in func_cpp.items():
+                if visited:
+                    continue
+                if fn in buf:
+                    func_cpp[fn] = True
+
+        # Calculate the total score from functions that are there and their
+        # method headers.
+        func_score = 1
+        clazz_comment = 0
+        if func_hpp[f"class {self.clazz} {{"]:
+            clazz_comment = 1
+        func_hpp.pop(f"class {self.clazz} {{")
+
+        func_frac = len(func_hpp) * 2
+        comments_score = 1
+        for k, v in func_hpp.items():
+            if not v:
+                func_score -= (1 / func_frac)
+        for k, v in func_cpp.items():
+            if not v:
+                func_score -= (1 / func_frac)
+        for k, v in func_comments.items():
+            if not v:
+                comments_score -= (1 / len(func_comments))
+
+        return func_score, comments_score, clazz_comment
+
+
+    def _check_header_dates(self, header):
+        """
+        This function extracts and parses date-like strings from the header.
+        It returns a list of successfully parsed dates.
+        """
+        # Regex to match potential date formats in the header
+        date_pattern = r"\b[\d/.-]+\b"
+        date_strings = [match.group() for match in re.finditer(date_pattern, header)]
+
+        parsed_dates = []
+        for date_string in date_strings:
+            try:
+                parsed_date = parser.parse(date_string)  # Try to parse the date
+                parsed_dates.append(parsed_date)  # Append the valid parsed date
+            except ValueError:
+                # If parsing fails, skip the invalid date
+                continue
+        return parsed_dates  # Return the list of valid dates    
+
+
+    def check_headers(self):
+        date_pattern = r"\d{2}/\d{2}/\d{2}"
+        # Pattern for "Created by" or "Modified by" followed by a name
+        name_pattern = r"(Created by|Modified by)\s+[\w\s]+"
+    
+        headers = { "hpp" : True, "cpp" : True }
+
+        # Flatten dictionary and just send all files to FileProcessor; it will
+        # determine file type.
+        files = list(self.files.values())
+        processor = FileProcessor(files, 'r')
+        for fh in processor:
+            lines = fh.readlines()
+            # If file doesn't contain beginning comment block, it doesn't have
+            # a header.
+            if "/**" not in lines[0]:
+                headers[fh.get_type()] = False
+                continue
+            
+            # Find the end of the comment block.
+            end = "".join(lines).find("*/")
+            if end == -1:
+                # Malformed comment block.
+                headers[fh.get_type()] = False
+                continue
+            
+            # Extract the header content.
+            header = "".join(lines[:end]).strip()
+            
+            # Check if the file name is in the header.
+            print(f"Looking for {fh.name} in header.")  # debug
+            if fh.name() not in header:
+                headers[fh.get_type()] = False
+                continue
+            
+            # Check if header contains valid dates.
+            if not self._check_header_dates(header):
+                headers[fh.get_type()] = False
+                continue
+            
+            # Check if the header contains the "Created by" or "Modified by" string.
+            if not re.search(name_pattern, header):
+                headers[fh.get_type()] = False
+                continue
+
+        score = 1
+        for k, v in headers.items():
+            if not v:
+                score -= (1 / len(headers))
+        return score
+
+
+    def check_list(self):
+        pts = 1
+    
+        found_lst = True
+        lst_names = {
+            "list",
+            "SLL",
+            "DLL",
+            "SinglyLinkedList",
+            "DoublyLinkedList"
+        }
+
+        # Flatten dictionary and just send all files to FileProcessor; it will
+        # determine file type.
+        files = list(self.files.values())
+        processor = FileProcessor(files, 'r')
+        for fh in processor: 
+            found = False
+            buf = fh.read()
+            # Check if any list-related name exists in the buffer.
+            if any(name in buf for name in lst_names):
+                found = True
+                break
+
+            if not found:
+                found_lst = False
+
+        return pts if found_lst else 0
+
+
+    def check_prime(self):
+        pts = 1
+    
+        limit = 10000
+        primes = list(primerange(2, limit + 1))
+
+        processor = FileProcessor(self.files["hpp"], 'r')
+        for fh in processor:
+            buf = fh.read()
+            # Check if any prime number is in the file.
+            if any(str(prime) in buf for prime in primes):
+                return pts
+
+        return 0
+
+    def store_impl(self):
+        return 0
+
