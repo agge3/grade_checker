@@ -10,7 +10,7 @@ def is_windows():
 # Function to check if files exist
 def check_files(files):
     """ Check if all files exist. """
-    return all(_check_file(file) for file in files)
+    return all(check_file(file) for file in files)
 
 
 def check_file(file):

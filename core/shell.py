@@ -40,7 +40,6 @@ class Shell:
             )
             if res.returncode != 0:
                 raise RuntimeError(f"grep check failed with error: {res.stderr}")
-            print("grep is available.")
         except FileNotFoundError:
             print("Error: `grep` command not found.")
             sys.exit(1)

@@ -1,10 +1,15 @@
-import util
+from tools import util
+from core.shell import Shell
 
+import os
+import subprocess
+import shutil
+import sys
 
 
 class Build:
     def __init__(self):
-        if _is_windows():
+        if util.is_windows():
             try:
                 self.exec_name = self._find_msbuild()
             except FileNotFoundError as e:
@@ -45,7 +50,6 @@ class Build:
     
         raise FileNotFoundError("msbuild.exe not found on this system.")
 
-
     def _find_sln_path(self):
         """ Find the .sln file on Windows. """
         search_command = 'findstr /S /I ".sln" *'
@@ -58,9 +62,10 @@ class Build:
                 text=True,
                 check=True,
             )
-            matches = result.stdout.strip().splitlines()
-            #matches = result.stdout
-            return matches[0] if matches else None
+            #matches = result.stdout.strip().splitlines()
+            stdout = result.stdout
+            print(f"stdout: {stdout}")
+            return stdout if stdout else None
         except subprocess.CalledProcessError as e:
             print(f"Error while searching for .sln file: {e.stderr}")
             return None
@@ -68,7 +73,7 @@ class Build:
 
     def make_run(self):
         """ Build and run the project. """
-        if _is_windows():
+        if util.is_windows():
             try:
                 res = subprocess.run(self.cmd, shell=True, capture_output=True, text=True)
             except Exception as e:
@@ -122,4 +127,3 @@ class Build:
         if res.returncode != 0:
             return res.stdout, False
         return res.stdout, True
-
