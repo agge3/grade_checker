@@ -28,8 +28,16 @@ python -m tests.unit.shell_unit # Specific example
     * `shell.py` - Cross platform shell. Most notably, handles git bash on
                    Windows to call bash scripts.
     * `file_processor.py` - Iterator for different file collections.
-    * `grader.py` - Main driver for Grade Checker.
+    * `grader.py` - Main driver for Grade Checker; handles "grading".
     * `reporter.py` - Reporting information for Grade Checker.
   * `tools`
     * `util.py` - Global utility functions.
   * `scripts` - Bash scripts for things that can be done easier with UNIX shell.
+    * `check-ec.sh` - Check for extra credit, specified by the following 
+                      parameters: `--smart_ptrs`, `--templates`, or `--gtest`.
+    * `check-static.sh` - Check for static or globals.
+    * `check-stl.sh` - Check for usage of the CXX STL.
+    * `find_hpp.sh` - Search for `.hpp` files of a class, accounting for 
+                      different file naming conventions.
+    * `find_cpp.sh` - Search for `.cpp` files of a class, accounting for 
+                      different file naming conventions.
