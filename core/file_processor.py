@@ -1,3 +1,6 @@
+import os
+
+
 # May take one file, or multiple files, or nested lists of files. Handles the
 # logic of handling those cases for a cleaner API where one file is processed
 # at one time to the client.
@@ -80,12 +83,12 @@ class FileProcessor:
             # Open the file in the given mode (op) and return the file handle
             fh = open(file_path, self.op)
             return fh  # Return the file handle so the client can read/write as needed
-        except FileNotFoundError:
-            raise Exception(f"File not found: {file_path}")
-        except PermissionError:
-            raise Exception(f"Permission denied: {file_path}")
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"File not found: {file_path}") from e
+        except PermissionError as e:
+            raise PermissionError(f"Permission denied: {file_path}") from e
         except Exception as e:
-            raise Exception(f"An error occurred while processing {file_path}: {e}")
+            raise Exception(f"An error occurred while processing {file_path}") from e
 
 
     # CREDIT: OpenAI's ChatGPT

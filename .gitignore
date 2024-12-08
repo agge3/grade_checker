@@ -1,2 +1,7 @@
 .venv
 __pycache__
+hidden
+core/__pycache__
+tools/__pycache__
+tests/unit/__pycache__
+tests/smoke/__pycache__

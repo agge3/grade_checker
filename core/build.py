@@ -55,21 +55,18 @@ class Build:
         search_command = 'findstr /S /I ".sln" *'
     
         try:
-            result = subprocess.run(
+            res = subprocess.run(
                 search_command,
                 shell=True,
                 capture_output=True,
                 text=True,
                 check=True,
             )
-            #matches = result.stdout.strip().splitlines()
-            stdout = result.stdout
-            print(f"stdout: {stdout}")
-            return stdout if stdout else None
+            matches = res.stdout.strip().splitlines()
+            return matches[0] if matches else None
         except subprocess.CalledProcessError as e:
             print(f"Error while searching for .sln file: {e.stderr}")
             return None
-
 
     def make_run(self):
         """ Build and run the project. """

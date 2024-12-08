@@ -5,11 +5,11 @@ Matching expected output for our supplied testcases
 Run unpublished testcases with expected output (we never got around to this)
 
 Global variables
-Static variables or methods
+[x] bash script: Static variables or methods
 Hard coded values (i.e., sizes of Hashtable, arrays, or cache, etc.)
-Lack of header files (all code in one file)
+[x] bash script (`find_hpp.sh` returns none): Lack of header files (all code in one file)
 Methods without any parameters (with the exception of getters/main)
-Use of STL before Milestone 4 (the implementations of the Data Structures should be hand-written, not use STL)
+[x] bash script: Use of STL before Milestone 4 (the implementations of the Data Structures should be hand-written, not use STL)
 Others?
 """
 

@@ -1,9 +1,11 @@
-from tools import util
 from core.shell import Shell
+from tools import util
 
 from tests.unit import util_unit
 from tests.unit import shell_unit
 from tests.unit import build_unit
+from tests.unit import file_processor_unit
+from tests.unit import grader_unit
 
 import unittest
 from unittest.mock import patch, MagicMock
@@ -21,6 +23,8 @@ def main():
     suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(util_unit))
     suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(shell_unit))
     suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(build_unit))
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(file_processor_unit))
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(grader_unit))
 
     # Run test suite.
     runner = unittest.TextTestRunner(verbosity=2)

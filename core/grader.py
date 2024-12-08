@@ -1,9 +1,24 @@
+from core.shell import Shell
+from core.build import Build
+from core.file_processor import FileProcessor
+from tools import util
+
+from sympy import primerange
+from dateutil import parser
+
+import sys
+import re
+
+
 class Grader:
     def __init__(self, shell, clazz):
         self.shell = shell
         self.clazz = clazz
+        self._init()
+
+    def _init(self):
         self.files = self._get_files()
-        if not _check_files(self.files):
+        if not util.check_files(self.files):
             print(f"Grader was unable to find files: {self.files}. Exiting...")
             sys.exit(1)
 
@@ -13,12 +28,12 @@ class Grader:
             "cpp" : []
         }
 
-        words = _split_clazz_name(self.clazz)
+        words = util.split_clazz_name(self.clazz)
         args = ' '.join(words)
 
         # Run the shell scripts to find `.hpp` and `.cpp` files.
         for ext in ["hpp", "cpp"]:
-            stdout, stderr, code = self.shell.cmd(f"./find_{ext}.sh {args}")
+            stdout, stderr, code = self.shell.cmd(f"./scripts/find_{ext}.sh {args}")
             if stdout.strip():  # Only add if there are results.
                 files[ext] = stdout.strip().splitlines()
 
