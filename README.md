@@ -41,3 +41,6 @@ python -m tests.unit.shell_unit # Specific example
                       different file naming conventions.
     * `find_cpp.sh` - Search for `.cpp` files of a class, accounting for 
                       different file naming conventions.
+  * `milestones` - JSON configuration files Grade Checker parses in for each
+                   milestone's configuration.
+    * `_milestoneX` - Each milestone's configuration file.
