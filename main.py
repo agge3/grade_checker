@@ -6,8 +6,9 @@ Run unpublished testcases with expected output (we never got around to this)
 
 Global variables
 [x] bash script: Static variables or methods
-Hard coded values (i.e., sizes of Hashtable, arrays, or cache, etc.)
+[xxx] grep for: Hard coded values (i.e., sizes of Hashtable, arrays, or cache, etc.)
 [x] bash script (`find_hpp.sh` returns none): Lack of header files (all code in one file)
+[xxx] might be harder, but probably a grep regex pattern:
 Methods without any parameters (with the exception of getters/main)
 [x] bash script: Use of STL before Milestone 4 (the implementations of the Data Structures should be hand-written, not use STL)
 Others?
