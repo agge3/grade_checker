@@ -11,6 +11,7 @@ fhs=() # xxx join those arrays
 
 for fh in "${fhs[@]}"
 do
+	# xxx pwd this and echo it out to stdout, so it can be logged
 	for search in "${stl[@]}"
 	do
 	    if grep -q "$search" "$fh"; then
