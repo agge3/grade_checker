@@ -1,6 +1,6 @@
 """
-Comments for File, Class and Method headers
-Implementations for all of the required methods
+[x] Comments for File, Class and Method headers
+[kind of] Implementations for all of the required methods
 Matching expected output for our supplied testcases
 Run unpublished testcases with expected output (we never got around to this)
 

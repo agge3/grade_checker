@@ -1,3 +1,4 @@
+import config
 from core.shell import Shell
 from core.build import Build
 from core.file_processor import FileProcessor
@@ -11,16 +12,38 @@ import re
 
 
 class Grader:
-    def __init__(self, shell, clazz):
+    def __init__(self, shell, milestone):
         self.shell = shell
-        self.clazz = clazz
+        self._milestone = milestone
+
+        self._merge_config()
         self._init()
+
+        self.score = {
+            "func" : 0,
+            "comments" : 0,
+            "class" : 0,
+        }
 
     def _init(self):
         self.files = self._get_files()
         if not util.check_files(self.files):
             print(f"Grader was unable to find files: {self.files}. Exiting...")
             sys.exit(1)
+
+    def _merge_config(self):
+        config.merge(f"_{self._milestone}")
+        strlst = config.methods_to_strlst()
+        self.clazz = config._config["class"]
+
+        self._func_hpp = { f"{e}(" : False for e in strlst }
+        self._func_hpp[f"class {self.clazz} {{"] = False
+        self._func_comments = self._func_hpp.copy()
+
+        self._func_cpp = {
+            k.split(' ', 1)[0] + f" {self.clazz}::{k.split(' ', 1)[1]}" : v
+            for k, v in self._func_hpp.items()
+        }
 
     def _get_files(self):
         files = {
@@ -42,60 +65,63 @@ class Grader:
 
     """Check for the presence of functions in the class header and definition files."""
     def check_func(self):
-        # xxx read in, maybe from json
-        func_hpp = {
-            f"class {self.clazz} {{" : False,
-            "HashNode** getTable(" : False,
-            "int getSize(" : False,
-            "bool isEmpty(" : False,
-            "int getNumberOfItems(" : False,
-            "bool add(" : False,
-            "bool remove(" : False,
-            "void clear(" : False,
-            "HashNode* getItem(" : False,
-            "bool contains(" : False,
-        }
-
-        func_comments = func_hpp.copy()
-
-        func_cpp = {
-            k.split(' ', 1)[0] + f" {self.clazz}::{k.split(' ', 1)[1]}" : v
-            for k, v in func_hpp.items()
-        }
-
         # Check the `.hpp` file for function declarations and method headers.
         processor = FileProcessor(self.files["hpp"], 'r')
         for fh in processor:
             lines = fh.readlines()
+            #print(lines)
             for idx, line in enumerate(lines):
-                for fn, visited in func_hpp.items():
+                #print(line)
+                for fn, visited in self._func_hpp.items():
                     if visited:
                         continue
                     if fn in line:
-                        func_hpp[fn] = True
+                        self._func_hpp[fn] = True
                         if "*/" in lines[idx - 1] or "//" in lines[idx - 1]:
-                            func_comments[fn] = True
+                            self._func_comments[fn] = True
 
         # Check the `.cpp` file for function definitions.
         processor = FileProcessor(self.files["cpp"], 'r')
         for fh in processor:
             buf = fh.read()
-            for fn, visited in func_cpp.items():
+            #print(buf)
+            for fn, visited in self._func_cpp.items():
                 if visited:
                     continue
                 if fn in buf:
-                    func_cpp[fn] = True
+                    self._func_cpp[fn] = True
+
+    def count_func(self):
+        func_hpp = func_cpp = func_comments = 0
+        for k, v in self._func_hpp.items():
+            if v:
+                func_hpp += 1
+        for k, v in self._func_cpp.items():
+            if v:
+                func_cpp += 1
+        for k, v in self._func_comments.items():
+            if v:
+                func_comments += 1
+        return func_hpp, func_cpp, func_comments
+    
+    def score_func(self):
+        func_hpp, func_cpp, func_comments = (
+
+            self._func_hpp, self._func_cpp, self._func_comments
+        )
 
         # Calculate the total score from functions that are there and their
         # method headers.
         func_score = 1
+        comments_score = 1
         clazz_comment = 0
+
         if func_hpp[f"class {self.clazz} {{"]:
             clazz_comment = 1
-        func_hpp.pop(f"class {self.clazz} {{")
 
-        func_frac = len(func_hpp) * 2
-        comments_score = 1
+        func_hpp.pop(f"class {self.clazz} {{")
+        func_frac = len(self._func_hpp) * 2
+
         for k, v in func_hpp.items():
             if not v:
                 func_score -= (1 / func_frac)
@@ -104,11 +130,11 @@ class Grader:
                 func_score -= (1 / func_frac)
         for k, v in func_comments.items():
             if not v:
-                comments_score -= (1 / len(func_comments))
+                comments_score -= (1 / len(self._func_comments))
 
         return func_score, comments_score, clazz_comment
 
-
+    # CREDIT: OpenAI's ChatGPT
     def _check_header_dates(self, header):
         """
         This function extracts and parses date-like strings from the header.
@@ -202,6 +228,27 @@ class Grader:
             buf = fh.read()
             # Check if any list-related name exists in the buffer.
             if any(name in buf for name in lst_names):
+                found = True
+                break
+
+            if not found:
+                found_lst = False
+
+        return pts if found_lst else 0
+
+    def check(self, lst):
+        pts = 1
+        found_lst = True
+
+        # Flatten dictionary and just send all files to FileProcessor; it will
+        # determine file type.
+        files = list(self.files.values())
+        processor = FileProcessor(files, 'r')
+        for fh in processor: 
+            found = False
+            buf = fh.read()
+            # Check if any list-related name exists in the buffer.
+            if any(e in buf for e in lst):
                 found = True
                 break
 

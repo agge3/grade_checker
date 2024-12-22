@@ -13,7 +13,9 @@ import io
 
 
 # Local globals:
+_milestone = "milestone3"
 _clazz = "HashTable"
+_config_path = "milestones/_milestone3.json"
 _fhs = (
     "HashTable.hpp\n"
     "HashTable.cpp\n"
@@ -44,6 +46,9 @@ public:
 	 * Destructor.
 	 */
 	~HashTable();
+
+    // Test different type of comment.
+    HashNode** getTable();
 
 	/**
 	 * Inserts a key-value pair into HashTable.
@@ -122,6 +127,11 @@ HashTable::~HashTable() {
 
 }
 
+HashNode** HashTable::getTable()
+{
+
+}
+
 void HashTable::add(int, HashNode*)
 {
 
@@ -137,31 +147,47 @@ HashNode* HashTable::getItem(int key) const
 
 }
 
-bool HashTable::contains(int) const;
+bool HashTable::contains(int) const
 {
 
 }
 
-int HashTable::getNumberOfItems() const;
+int HashTable::getNumberOfItems() const
 {
 
 }
 
-bool HashTable::isEmpty() const;
+bool HashTable::isEmpty() const
 {
 
 }
 
-void HashTable::clear();
+void HashTable::clear()
 {
 
 }
 
-int HashTable::getSize();
+int HashTable::getSize()
 {
 
 }
 EOF"""
+
+
+builtin_open = open  # save the unpatched version
+
+# Control mock_open side effects to use the real `open` for specific files.
+def _mock_open(*args, **kwargs):
+    # Specific files to use "real" open:
+    if args[0] == _config_path:
+        return builtin_open(*args, **kwargs)
+    elif args[0] == f"{_clazz}.hpp":
+        return mock_hpp
+    elif args[0] == f"{_clazz}.cpp":
+        return mock_cpp
+
+    # Mock open for all other files.
+    return MagicMock(spec = io.StringIO)
 
 
 class TestGrader(unittest.TestCase):
@@ -177,7 +203,8 @@ class TestGrader(unittest.TestCase):
 
         grader = Grader.__new__(Grader) # bypass Grader init procedures
         grader.shell = self.shell
-        grader.clazz = _clazz
+        grader._milestone = _milestone
+        grader._merge_config()
 
         files = grader._get_files()
         self.assertEqual(files["hpp"], [])
@@ -196,7 +223,8 @@ class TestGrader(unittest.TestCase):
 
         grader = Grader.__new__(Grader) # bypass Grader init procedures
         grader.shell = self.shell
-        grader.clazz = _clazz
+        grader._milestone = _milestone
+        grader._merge_config()
 
         files = grader._get_files()
         self.assertEqual(files["hpp"], [f"{_clazz}.hpp"])
@@ -216,7 +244,8 @@ class TestGrader(unittest.TestCase):
 
         grader = Grader.__new__(Grader) # bypass Grader init procedures
         grader.shell = self.shell
-        grader.clazz = _clazz
+        grader._milestone = _milestone
+        grader._merge_config()
 
         with self.assertRaises(SystemExit) as cmd:
             grader._init()
@@ -237,7 +266,8 @@ class TestGrader(unittest.TestCase):
 
         grader = Grader.__new__(Grader) # bypass Grader init procedures
         grader.shell = self.shell
-        grader.clazz = _clazz
+        grader._milestone = _milestone
+        grader._merge_config()
         grader._init()
 
         mock_exit.assert_not_called()
@@ -250,7 +280,7 @@ class TestGrader(unittest.TestCase):
         ]
         
         with self.assertRaises(SystemExit) as cmd:
-            grader = Grader(shell = self.shell, clazz = _clazz)
+            grader = Grader(shell = self.shell, milestone = _milestone)
 
             self.assertEqual(cmd.exception.code, 1)
             self.assertIn(
@@ -266,14 +296,14 @@ class TestGrader(unittest.TestCase):
             (f"{_clazz}.cpp\n", "", 0),  # second call, for cpp
         ]
 
-        grader = Grader(shell = self.shell, clazz = _clazz)
+        grader = Grader(shell = self.shell, milestone = _milestone)
 
         mock_exit.assert_not_called()
 
     @patch("core.file_processor.FileProcessor")
-    @patch('tools.util.check_file', return_value=True)
-    @patch("builtins.open", new_callable=MagicMock)
-    def test_check_prime(self, mock_open, mock_check_file, mock_fproc):
+    @patch('tools.util.check_file', return_value = True)
+    @patch("builtins.open", _mock_open)
+    def test_check_prime(self, mock_check_file, mock_fproc):
         """ Test Grader's check_prime method """
         self.shell.cmd.side_effect = [
             (f"{_clazz}.hpp\n", "", 0),  # first call, for hpp
@@ -281,15 +311,16 @@ class TestGrader(unittest.TestCase):
         ]
 
         # Mock FileProcessor to return a mocked file handle with a buffer.
-        mock_file = MagicMock(spec=io.StringIO) # behave like a file
+        global mock_hpp
+        mock_hpp = MagicMock(spec = io.StringIO) # behave like a file
 
         # Buffer:
-        mock_file.read.return_value = _hpp
+        mock_hpp.read.return_value = _hpp
 
-        mock_open.return_value = mock_file
-        mock_fproc.return_value.__iter__.return_value = [mock_file]
+        mock_open.return_value = mock_hpp
+        mock_fproc.return_value.__iter__.return_value = [mock_hpp]
 
-        grader = Grader(shell = self.shell, clazz = _clazz)
+        grader = Grader(shell = self.shell, milestone = _milestone)
         
         # The check_prime method should detect a prime number in the buffer and
         # return 1.
@@ -298,6 +329,109 @@ class TestGrader(unittest.TestCase):
         # Validate that the check_prime method detects primes correctly.
         self.assertEqual(prime_score, 1)
 
+    @patch("core.file_processor.FileProcessor")
+    @patch('tools.util.check_file', return_value=True)
+    @patch("builtins.open", _mock_open)
+    def test_check_list(self, mock_check_file, mock_fproc):
+        """ Test Grader's check_prime method """
+        self.shell.cmd.side_effect = [
+            (f"{_clazz}.hpp\n", "", 0),  # first call, for hpp
+            (f"{_clazz}.cpp\n", "", 0),  # second call, for cpp
+        ]
+
+        # Mock FileProcessor to return a mocked file handle with a buffer.
+        global mock_hpp
+        mock_hpp = MagicMock(spec = io.StringIO) # behave like a file
+
+        # Buffer:
+        mock_hpp.read.return_value = _hpp
+
+        mock_open.return_value = mock_hpp
+        mock_fproc.return_value.__iter__.return_value = [mock_hpp]
+
+        grader = Grader(shell = self.shell, milestone = _milestone)
+        
+        # The check_prime method should detect a prime number in the buffer and
+        # return 1.
+        list_score = grader.check_list()
+
+        # Validate that the check_prime method detects primes correctly.
+        self.assertEqual(list_score, 1)
+
+
+    @patch("core.file_processor.FileProcessor")
+    @patch('tools.util.check_file', return_value=True)
+    @patch("builtins.open", _mock_open)
+    def test_check_headers(self, mock_check_file, mock_fproc):
+        """ Test Grader's check_headers method """
+        self.shell.cmd.side_effect = [
+            (f"{_clazz}.hpp\n", "", 0),  # first call, for hpp
+            (f"{_clazz}.cpp\n", "", 0),  # second call, for cpp
+        ]
+
+        # Mock FileProcessor to return a mocked file handle with a buffer.
+        global mock_hpp, mock_cpp
+        mock_hpp = MagicMock(spec=io.StringIO) # behave like a file
+        mock_cpp = MagicMock(spec=io.StringIO) # behave like a file
+
+        # Buffer:
+        mock_hpp.read.return_value = _hpp
+        mock_cpp.read.return_value = _cpp
+        mock_hpp.readlines.return_value = _hpp.splitlines(keepends = True)
+        mock_cpp.readlines.return_value = _cpp.splitlines(keepends = True)
+        mock_hpp.get_type = MagicMock(return_value = ".hpp")
+        mock_cpp.get_type = MagicMock(return_value = ".cpp")
+        mock_hpp.name = MagicMock(return_value = "HashTable")
+        mock_cpp.name = MagicMock(return_value = "HashTable")
+
+        mock_open.side_effect = [mock_hpp, mock_cpp]
+        mock_fproc.return_value.__iter__.return_value = [mock_hpp, mock_cpp]
+
+        grader = Grader(shell = self.shell, milestone = _milestone)
+        
+        header_score = grader.check_headers()
+
+        self.assertEqual(header_score, 1)
+
+    @patch("core.file_processor.FileProcessor")
+    @patch('tools.util.check_file', return_value = True)
+    @patch("builtins.open", _mock_open)
+    def test_check_func(self, mock_check_file, mock_fproc):
+        """ Test Grader's check_func method. """
+        self.shell.cmd.side_effect = [
+            (f"{_clazz}.hpp\n", "", 0),  # first call, for hpp
+            (f"{_clazz}.cpp\n", "", 0),  # second call, for cpp
+        ]
+
+        # Mock FileProcessor to return a mocked file handle with a buffer.
+        global mock_hpp, mock_cpp
+        mock_hpp = MagicMock(spec = io.StringIO) # behave like a file
+        mock_cpp = MagicMock(spec = io.StringIO)
+
+        # Buffer:
+        mock_hpp.read.return_value = _hpp
+        mock_cpp.read.return_value = _cpp
+        mock_hpp.readlines.return_value = _hpp.splitlines(keepends = True)
+        mock_cpp.readlines.return_value = _cpp.splitlines(keepends = True)
+
+        #mock_open.side_effect = [mock_hpp, mock_cpp]
+        mock_fproc.return_value.__iter__.return_value = [mock_hpp, mock_cpp]
+
+        grader = Grader(shell = self.shell, milestone = _milestone)
+
+        grader.check_func()
+        func_hpp, func_cpp, func_comments = grader.count_func()
+
+        # All header functions are in the buffer; this should be all.
+        self.assertEqual(func_hpp, 10)
+
+        # One implementation is missing in the buffer; this should be one less
+        # than the header score.
+        self.assertEqual(func_cpp, 9)
+
+        # One comment is missing for the comments; this should be one less than
+        # the header score.
+        self.assertEqual(func_comments, 9)
  
     #@patch("core.file_processor.FileProcessor")
     #@patch('tools.util.check_file', return_value=True)

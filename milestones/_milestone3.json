@@ -1,61 +1,60 @@
 {
-	"milestone3": {
-		"class": "HashTable",
-		"methods": {
-		    "getTable": {
-		        "return": "HashNode**",
-		        "parameter": "int"
-		    },
-		    "getSize": {
-		        "return": "int",
-		        "parameter": null
-		    },
-		    "isEmpty": {
-		        "return": "bool",
-		        "parameter": null
-		    },
-		    "getNumberOfItems": {
-		        "return": "int",
-		        "parameter": null
-		    },
-		    "add": {
-		        "return": "bool",
-		        "parameter": null
-		    },
-		    "remove": {
-		        "return": "bool",
-		        "parameter": null
-		    },
-		    "clear": {
-		        "return": "void",
-		        "parameter": null
-		    },
-		    "getItem": {
-		        "return": "HashNode*",
-		        "parameter": null
-		    },
-		    "contains": {
-		        "return": "bool",
-		        "parameter": null
-		    }
-		},
-    	"options": {
-			"os" : "nix",
-			"build": false,
-			"output": true
-		},
-    	"grading": {
-    		"points": 50
-    	},
-    	"extra_credit": {
-    		"enabled": true,
-    		"args": ["smart_ptrs", "templates", "gtest" ]
-    	},
-		"scripts": [
-			"check-static.sh"
-		],
-		"files": [
-			"milestone3.json"
-		]
-  	}
+	"milestone": "milestone3",
+	"class": "HashTable",
+	"methods": {
+	    "getTable": {
+	        "return": "HashNode**",
+	        "parameter": "int"
+	    },
+	    "getSize": {
+	        "return": "int",
+	        "parameter": null
+	    },
+	    "isEmpty": {
+	        "return": "bool",
+	        "parameter": null
+	    },
+	    "getNumberOfItems": {
+	        "return": "int",
+	        "parameter": null
+	    },
+	    "add": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "remove": {
+	        "return": "bool",
+	        "parameter": null
+	    },
+	    "clear": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "getItem": {
+	        "return": "HashNode*",
+	        "parameter": null
+	    },
+	    "contains": {
+	        "return": "bool",
+	        "parameter": null
+	    }
+	},
+    "options": {
+		"os" : "nix",
+		"build": false,
+		"output": true
+	},
+    "grading": {
+    	"points": 50
+    },
+    "extra_credit": {
+    	"enabled": true,
+    	"args": ["smart_ptrs", "templates", "gtest" ]
+    },
+	"scripts": [
+		"check-static.sh"
+	],
+	"files": [
+		"milestone3.json"
+	]
 }
