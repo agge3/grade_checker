@@ -11,13 +11,15 @@ import os
 class TestShell(unittest.TestCase):
     @patch.object(os, 'name', 'nt')
     @patch('core.shell.Shell._get_git_bash_path',
-        return_value="C:\\Program Files\\Git\\bin\\bash.exe")
-    def test_get_bash_path_win(self, mock_git_bash_path):
+        return_value = "C:\\Program Files\\Git\\bin\\bash.exe")
+    @patch('core.shell.Shell._check_dep', return_value = True)
+    def test_get_bash_path_win(self, mock_git_bash_path, mock_check_dep):
         shell = Shell()
         self.assertEqual(shell._bash, "C:\\Program Files\\Git\\bin\\bash.exe")
 
     @patch.object(os, 'name', 'posix')
-    def test_get_bash_path_nix(self):
+    @patch('core.shell.Shell._check_dep', return_value = True)
+    def test_get_bash_path_nix(self, mock_check_dep):
         shell = Shell()
         self.assertEqual(shell._bash, "/usr/bin/env bash")
 

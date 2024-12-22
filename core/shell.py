@@ -35,11 +35,9 @@ class Shell:
         On Windows, Git Bash includes grep; ensure it works.
         """
         try:
-            res = subprocess.run(
-                "grep --version", shell=True, capture_output=True, text=True
-            )
-            if res.returncode != 0:
-                raise RuntimeError(f"grep check failed with error: {res.stderr}")
+            stdout, stderr, code = self.cmd("grep --version")
+            if code != 0:
+                raise RuntimeError(f"grep check failed with error: {stderr}")
         except FileNotFoundError:
             print("Error: `grep` command not found.")
             sys.exit(1)
@@ -52,8 +50,8 @@ class Shell:
         if util.is_windows():
             # Wrap the command for Git Bash compatibility.
             # xxx why do we need to join here?
-            bash_cmd = ' '.join(cmd)
-            result = subprocess.run([self._bash, "-c", bash_cmd], capture_output=True, text=True)
+            result = subprocess.run(f"{self._bash} -c \"{cmd}\"",
+                                    capture_output=True, text=True)
         else:
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
