@@ -23,6 +23,18 @@ def check_file(file):
     return True
 
 
+# Splits a PascalCase class name into a list: `["Pascal", "Case"]`.
 def split_clazz_name(clazz):
     """ Split class name into words based on uppercase letters. """
     return re.findall(r'[A-Z][a-z]*', clazz)
+
+
+# Converts a list to a space-separated string.
+def lst_to_str(lst):
+    s = ""
+    for i in range(0, len(lst)):
+        if i + 1 == len(lst):
+            s += lst[i]
+        else:
+            s += lst[i] + " "
+    return s

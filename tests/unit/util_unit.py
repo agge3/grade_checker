@@ -43,6 +43,17 @@ class TestUtil(unittest.TestCase):
         # xxx not designed to handle all lowercase, maybe change?
         #self.assertEqual(gc._split_clazz_name("simple"), [ 'simple' ])  # No uppercase letters
 
+    def test_lst_to_str(self):
+        lst = ["hi", "hello", "ello"]
+        s = util.lst_to_str(lst)
+        self.assertEquals(s, "hi hello ello")
+        lst = []
+        s = util.lst_to_str(lst)
+        self.assertEquals(s, "")
+        lst = ["hi"]
+        s = util.lst_to_str(lst)
+        self.assertEquals(s, "hi")
+
 
 if __name__ == "__main__":
     unittest.main()

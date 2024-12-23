@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Exits with error if CXX STL found. Exits without error is CXX STL not found.
+# Exits with error if CXX STL found. Exits without error if CXX STL not found.
 
 # Search strings.
 static=("static")

@@ -14,6 +14,8 @@ Methods without any parameters (with the exception of getters/main)
 Others?
 """
 
+import argparse
+
 # Grade HashTable.
 def grade_hash_table():
     shell = Shell()
@@ -51,8 +53,50 @@ def grade_hash_table():
 
 
 def main():
-    final_score = grade_hash_table()  # Capture the final score
-    print(f"Final Score: {final_score}")  # Print the final score
+    parser = argparse.ArgumentParser(
+            prog = "Grade Checker"
+    )
+    parser.add_argument("milestone")
+
+    args = parser.parse_args()
+    config.merge(args.milestone)
+
+    shell = Shell()
+    grader = Grader(shell, args.milestone)
+
+    name = ""   # pwd and regex capture project root
+    score = config._config["grading"]["total"]
+    
+    if config._config["options"]["build"]:
+        build = Build()
+        out, res = build.make_run()
+        
+        if not res:
+            score -= config._config["grading"]["build"]
+            print("Build unsuccessful. Report:")
+            print(out)
+        else:
+            print("Build successful. Report:")
+            print(out)
+
+    if config._config["extra_credit"]["enabled"]:
+        pts, out = grader.check_ec(config._config["extra_credit"]["args"])
+        score += config._config["grading"]["extra_credit"]
+        print(out)
+
+
+    pts, out = grader.check_headers(config._config["grading"]["headers"])
+    score -= pts
+    print(out)
+
+    pts, out = grader.check_func(config._config["grading"]["methods"])
+    score -= pts
+    print(out)
+
+
+
+
+    
 
 
 if __name__ == "__main__":

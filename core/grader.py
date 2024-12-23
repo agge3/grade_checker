@@ -236,27 +236,25 @@ class Grader:
 
         return pts if found_lst else 0
 
-    def check(self, lst):
-        pts = 1
-        found_lst = True
+    def check_for(self, lst, total_points = 1, deduction = 1):
+        out = []
+        s = lst_to_str(lst)
 
-        # Flatten dictionary and just send all files to FileProcessor; it will
-        # determine file type.
         files = list(self.files.values())
         processor = FileProcessor(files, 'r')
         for fh in processor: 
-            found = False
-            buf = fh.read()
-            # Check if any list-related name exists in the buffer.
-            if any(e in buf for e in lst):
-                found = True
+            l = self.shell.cmd(f"scripts/check-for.sh ${fh} ${s}").splitlines()
+            out.extend(l)
+
+        for i in range(0, len(out)):
+            # Deduct the deduction amount from total points for each found 
+            # instance of "check_for".
+            total_points -= deduction
+            if (total_points <= 0): # points shouldn't be below zero
+                total_points = 0
                 break
 
-            if not found:
-                found_lst = False
-
-        return pts if found_lst else 0
-
+        return total_points, out
 
     def check_prime(self):
         pts = 1
@@ -272,6 +270,25 @@ class Grader:
                 return pts
 
         return 0
+
+    def check_ec(self, args, points):
+        ec_args = ' '.join(ec_args_lst)  # Join the list into a single string
+        out = []
+
+        files = list(self.files.values())
+        processor = FileProcessor(files, 'r')
+        for fh in processor:
+            # xxx change script to take file as first parameter.
+            stdout, stderr, code = shell.cmd(f"./check-ec.sh {ec_args}")
+            out.append(stdout)
+
+        # Calculate the total extra credit points from occurrences of extra
+        # credit and points for each extra credit.
+        total = 0
+        for i in range(0, len(out)):
+            total += points
+
+        return total, out
 
     def store_impl(self):
         return 0

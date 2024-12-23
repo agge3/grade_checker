@@ -61,7 +61,11 @@
 		"output": true
 	},
     "grading": {
-      "points": 50
+    	"total": 50,
+		"build": 25,
+		"extra_credit": 4,
+		"headers": 1,
+		"methods": 1
     },
     "extra_credit": {
       "enabled": false,

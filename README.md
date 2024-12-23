@@ -21,15 +21,18 @@ python -m tests.unit.shell_unit # Specific example
 ## Organization
 * `root`
   * `main.py` - Main entry point.
+  * `main.ps1` - Bootstrapping for Windows setup.
   * `config.py` - Reads in Grade Checker's configuration file and handles
                   different grading configurations.
   * `core`
-    * `build.py` - Cross platform CXX project building.
+    * `build.py` - Cross platform CXX project auto-building.
     * `shell.py` - Cross platform shell. Most notably, handles git bash on
                    Windows to call bash scripts.
     * `file_processor.py` - Iterator for different file collections.
     * `grader.py` - Main driver for Grade Checker; handles "grading".
     * `reporter.py` - Reporting information for Grade Checker.
+    * `scorer.py` - Scores the grade report, with justification snippets when
+                    scoring unfavourably to the student.
   * `tools`
     * `util.py` - Global utility functions.
   * `scripts` - Bash scripts for things that can be done easier with UNIX shell.
@@ -37,6 +40,7 @@ python -m tests.unit.shell_unit # Specific example
                       parameters: `--smart_ptrs`, `--templates`, or `--gtest`.
     * `check-static.sh` - Check for static or globals.
     * `check-stl.sh` - Check for usage of the CXX STL.
+    * `check-for.sh` - Checks for provided arguments.
     * `find_hpp.sh` - Search for `.hpp` files of a class, accounting for 
                       different file naming conventions.
     * `find_cpp.sh` - Search for `.cpp` files of a class, accounting for 
