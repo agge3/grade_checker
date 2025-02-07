@@ -5,3 +5,5 @@ core/__pycache__
 tools/__pycache__
 tests/unit/__pycache__
 tests/smoke/__pycache__
+repos
+.env

@@ -32,7 +32,7 @@ class Grader:
             sys.exit(1)
 
     def _merge_config(self):
-        config.merge(f"_{self._milestone}")
+        config.merge(f"{self._milestone}")
         strlst = config.methods_to_strlst()
         self.clazz = config._config["class"]
 

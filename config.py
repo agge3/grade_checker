@@ -42,8 +42,8 @@ def validate():
             if option_key not in _config['options']:
                 raise KeyError(f"Missing option: {option_key}")
 
-    if 'grading' in _config and 'points' not in _config['grading']:
-        raise KeyError("Missing grading key: points")
+    if 'grading' in _config and 'total' not in _config['grading']:
+        raise KeyError("Missing grading key: total")
 
     if 'extra_credit' in _config:
         extra_credit_keys = ['enabled', 'args']
@@ -59,7 +59,9 @@ def merge(milestone):
     global _config  # Ensure the function modifies the global _config.
 
     # Construct the full path for the milestone.
-    path = f"milestones/{milestone}.json"
+    print(milestone)
+    path = f"milestones/_{milestone}.json"
+    print(path)
 
     # Read JSON config from the milestone path.
     try:
@@ -67,12 +69,12 @@ def merge(milestone):
             cfg = json.load(file)
     except FileNotFoundError:
         raise FileNotFoundError(
-            f"Error: The file '{path}' was not found." + 
+            f"Error: The file '{path}' was not found. " + 
             f"Please ensure the path is correct."
         )
     except json.JSONDecodeError:
         raise ValueError(
-            f"Error: The file '{path}' is not a valid JSON file." + 
+            f"Error: The file '{path}' is not a valid JSON file. " + 
             f"Please check its contents."
         )
 
@@ -150,6 +152,6 @@ def print_config():
 
 # Example usage
 if __name__ == "__main__":
-    merge("_milestone1")
+    merge("milestone1")
     print_config()
     methods_to_strlst()

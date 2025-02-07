@@ -1,18 +1,18 @@
 """
-[x] Comments for File, Class and Method headers
-[kind of] Implementations for all of the required methods
 Matching expected output for our supplied testcases
 Run unpublished testcases with expected output (we never got around to this)
 
 Global variables
-[x] bash script: Static variables or methods
-[xxx] grep for: Hard coded values (i.e., sizes of Hashtable, arrays, or cache, etc.)
+
 [x] bash script (`find_hpp.sh` returns none): Lack of header files (all code in one file)
-[xxx] might be harder, but probably a grep regex pattern:
-Methods without any parameters (with the exception of getters/main)
-[x] bash script: Use of STL before Milestone 4 (the implementations of the Data Structures should be hand-written, not use STL)
-Others?
 """
+
+import config
+from tools import util
+from core.shell import Shell
+from core.build import Build
+from core.fetch import Fetcher
+from core.grader import Grader
 
 import argparse
 
@@ -57,46 +57,51 @@ def main():
             prog = "Grade Checker"
     )
     parser.add_argument("milestone")
+    parser.add_argument("-f", "--fetch", action="store_true",
+                        help="Fetch GitHub(R) repos.")
+    parser.add_argument("-g", "--grade", action="store_true",
+                        help="Grade fetched repos.")
 
     args = parser.parse_args()
     config.merge(args.milestone)
 
-    shell = Shell()
-    grader = Grader(shell, args.milestone)
+    if args.fetch:
+        shell = Shell()
+        fetcher = Fetcher(shell, args.milestone)
+        fetcher.fetch()
 
-    name = ""   # pwd and regex capture project root
-    score = config._config["grading"]["total"]
-    
-    if config._config["options"]["build"]:
-        build = Build()
-        out, res = build.make_run()
+    if args.grade:
+        shell = Shell()
+        grader = Grader(shell, args.milestone)
+
+        name = ""   # pwd and regex capture project root
+        score = config._config["grading"]["total"]
         
-        if not res:
-            score -= config._config["grading"]["build"]
-            print("Build unsuccessful. Report:")
-            print(out)
-        else:
-            print("Build successful. Report:")
+        if config._config["options"]["build"]:
+            build = Build()
+            out, res = build.make_run()
+            
+            if not res:
+                score -= config._config["grading"]["build"]
+                print("Build unsuccessful. Report:")
+                print(out)
+            else:
+                print("Build successful. Report:")
+                print(out)
+
+        if config._config["extra_credit"]["enabled"]:
+            pts, out = grader.check_ec(config._config["extra_credit"]["args"])
+            score += config._config["grading"]["extra_credit"]
             print(out)
 
-    if config._config["extra_credit"]["enabled"]:
-        pts, out = grader.check_ec(config._config["extra_credit"]["args"])
-        score += config._config["grading"]["extra_credit"]
+
+        pts, out = grader.check_headers(config._config["grading"]["headers"])
+        score -= pts
         print(out)
 
-
-    pts, out = grader.check_headers(config._config["grading"]["headers"])
-    score -= pts
-    print(out)
-
-    pts, out = grader.check_func(config._config["grading"]["methods"])
-    score -= pts
-    print(out)
-
-
-
-
-    
+        pts, out = grader.check_func(config._config["grading"]["methods"])
+        score -= pts
+        print(out)
 
 
 if __name__ == "__main__":

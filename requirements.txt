@@ -1,2 +1,5 @@
 python-dateutil
 sympy
+beautifulsoup4
+requests
+python-dotenv
