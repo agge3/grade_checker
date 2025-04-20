@@ -1,0 +1,85 @@
+{
+	"milestone" : "milestone1",
+	"prof": "hugh",
+	"org": "SFSU-CSC-340-3",
+	"clone": true,
+	"glob": "doubly-linked-list",
+	"class" : "DoublyLinkedList",
+	"methods": {
+	    "insertAtHead": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "insertAtTail": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "findNode": {
+	        "return": "Node*",
+	        "parameter": null
+	    },
+	    "deleteNode": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "moveToHead": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "moveToTail": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "deleteHeadNode": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "deleteTailNode": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "printList": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "reversePrintList": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "deleteList": {
+	        "return": "void",
+	        "parameter": null
+	    },
+	    "toVector": {
+	        "return": "IntVector*",
+	        "parameter": null
+	    },
+	    "toReverseVector": {
+	        "return": "IntVector*",
+	        "parameter": null
+	    }
+	},
+	"options": {
+		"os" : "nix",
+		"build": false,
+		"output": true
+	},
+    "grading": {
+		"points": 50,
+		"headers": 11,
+		"methods": 11
+    },
+	"fetch": {
+		"clear": true
+	},
+    "extra_credit": {
+      "enabled": false,
+      "args": []
+    },
+	"script": [
+		"check-static.sh"
+	],
+	"files": [
+		"milestone1.json"
+	]
+}

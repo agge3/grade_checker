@@ -1,43 +1,55 @@
 {
-	"milestone": "milestone3",
+	"milestone": "milestone2",
+	"prof": "hugh",
+	"org": "SFSU-CSC-340-3",
+	"clone": true,
+	"glob": "hashtable",
 	"class": "HashTable",
 	"methods": {
 	    "getTable": {
 	        "return": "HashNode**",
-	        "parameter": "int"
+	        "params": null
 	    },
 	    "getSize": {
 	        "return": "int",
-	        "parameter": null
+	        "params": null
 	    },
+		"calculateHashCode": {
+			"return": "int",
+			"params": [ "int" ]
+		},
 	    "isEmpty": {
 	        "return": "bool",
-	        "parameter": null
+	        "params": null
 	    },
 	    "getNumberOfItems": {
 	        "return": "int",
-	        "parameter": null
+	        "params": null
 	    },
 	    "add": {
-	        "return": "void",
-	        "parameter": null
+	        "return": "bool",
+	        "params": [ "int", "HashNode*" ]
 	    },
 	    "remove": {
 	        "return": "bool",
-	        "parameter": null
+	        "params": [ "int" ]
 	    },
 	    "clear": {
 	        "return": "void",
-	        "parameter": null
+	        "params": null
 	    },
 	    "getItem": {
 	        "return": "HashNode*",
-	        "parameter": null
+	        "params": [ "int" ]
 	    },
 	    "contains": {
 	        "return": "bool",
-	        "parameter": null
-	    }
+	        "params": [ "int" ]
+	    },
+		"printTable": {
+			"return": "void",
+			"params": null
+		}
 	},
     "options": {
 		"os" : "nix",
@@ -45,16 +57,21 @@
 		"output": true
 	},
     "grading": {
-    	"points": 50
+    	"points": 50,
+		"headers": 11,
+		"methods": 11
     },
+	"fetch": {
+		"clear": true
+	},
     "extra_credit": {
     	"enabled": true,
-    	"args": ["smart_ptrs", "templates", "gtest" ]
+    	"args": [ "gtest" ]
     },
 	"scripts": [
 		"check-static.sh"
 	],
 	"files": [
-		"milestone3.json"
+		"milestone2.json"
 	]
 }

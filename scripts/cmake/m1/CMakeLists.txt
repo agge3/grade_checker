@@ -1,0 +1,40 @@
+# Tested CMake versions:
+cmake_minimum_required(VERSION 3.14...3.27)
+
+# Project name, description, language, etc.
+project(Milestone_1
+    DESCRIPTION  "hi"
+    LANGUAGES CXX)
+
+# Use CXX 17+.
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Version numbers:
+set(VERSION_MAJOR 0)
+set(VERSION_MINOR 0)
+set(VERSION_PATCH 0)
+
+# Executable(s):
+add_executable(Milestone_1)
+
+# Debug build compiler flags.
+set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Wall")
+
+# Release build compiler flags.
+set(CMAKE_CXX_FLAGS_RELEASE_INIT "")
+
+# Add source files to target(s).
+file(GLOB SRC *.cpp)
+target_sources(Milestone_1 PRIVATE ${SRC})
+
+# Add include directories to target(s).
+# Local include directory.
+target_include_directories(Milestone_1 PRIVATE 
+	${CMAKE_CURRENT_SOURCE_DIR}/include/
+)
+
+# Copy necessary directories into build directory, for executable root access.
+add_custom_command(TARGET Milestone_1 PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_SOURCE_DIR}/*.json $<TARGET_FILE_DIR:Milestone_1>)

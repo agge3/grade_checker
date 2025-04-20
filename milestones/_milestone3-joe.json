@@ -1,0 +1,77 @@
+{
+	"milestone": "milestone3",
+	"prof": "joe",
+	"org": "joe-hui-sfsu",
+	"clone": true,
+	"glob": "cachemanager",
+	"class": "CacheManager",
+	"methods": {
+	    "getTable": {
+	        "return": "HashNode*",
+	        "params": null
+	    },
+	    "getList": {
+	        "return": "DoublyLinkedList*",
+	        "params": null
+	    },
+		"getSize": {
+			"return": "int",
+			"params": null
+		},
+	    "isEmpty": {
+	        "return": "bool",
+	        "params": null
+	    },
+	    "add": {
+	        "return": "bool",
+	        "params": [ "int", "DllNode*" ]
+	    },
+	    "remove": {
+	        "return": "bool",
+	        "params": [ "int" ]
+	    },
+	    "clear": {
+	        "return": "void",
+	        "params": null
+	    },
+	    "getItem": {
+	        "return": "DllNode*",
+	        "params": [ "int" ]
+	    },
+	    "getMaxCacheSize": {
+	        "return": "int",
+	        "params": null
+	    },
+		"contains": {
+			"return": "bool",
+			"params": "int"
+		},
+		"printCache": {
+			"return": "void",
+			"params": null
+		}
+	},
+    "options": {
+		"os" : "nix",
+		"build": false,
+		"output": true
+	},
+    "grading": {
+    	"points": 50,
+		"headers": 11,
+		"methods": 11
+    },
+	"fetch": {
+		"clear": true
+	},
+    "extra_credit": {
+    	"enabled": true,
+    	"args": [ "gtest" ]
+    },
+	"scripts": [
+		"check-static.sh"
+	],
+	"files": [
+		"milestone3.json"
+	]
+}

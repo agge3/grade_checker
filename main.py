@@ -13,8 +13,10 @@ from core.shell import Shell
 from core.build import Build
 from core.fetch import Fetcher
 from core.grader import Grader
+from core.reporter2 import Reporter2
 
 import argparse
+import re
 
 # Grade HashTable.
 def grade_hash_table():
@@ -61,18 +63,25 @@ def main():
                         help="Fetch GitHub(R) repos.")
     parser.add_argument("-g", "--grade", action="store_true",
                         help="Grade fetched repos.")
+    parser.add_argument("-r", "--report", action="store_true",
+                        help="Grade and report fetched repos.")
 
     args = parser.parse_args()
+
+    # xxx we're capturing `.json` too, but we don't really need too...
+    #reg = re.search(r"^(\w+)-.*(.json)$", args.milestone)
+    reg = re.search(r"^(\w+)-.*$", args.milestone)
+    milestone = reg[1]  # expected output: milestoneX
+
     config.merge(args.milestone)
 
     if args.fetch:
-        shell = Shell()
-        fetcher = Fetcher(shell, args.milestone)
+        fetcher = Fetcher(milestone, config._config)
         fetcher.fetch()
 
     if args.grade:
         shell = Shell()
-        grader = Grader(shell, args.milestone)
+        grader = Grader(shell, milestone, config)
 
         name = ""   # pwd and regex capture project root
         score = config._config["grading"]["total"]
@@ -102,6 +111,19 @@ def main():
         pts, out = grader.check_func(config._config["grading"]["methods"])
         score -= pts
         print(out)
+
+    if args.report:
+        print("main: Entered Reporter.")
+        reporter = Reporter2(milestone, config._config)
+        reporter._report()
+        reporter.report()
+        # xxx we always build. keep track of what's already built to not build
+        # again.
+
+
+
+        
+
 
 
 if __name__ == "__main__":

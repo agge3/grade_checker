@@ -7,3 +7,6 @@ tests/unit/__pycache__
 tests/smoke/__pycache__
 repos
 .env
+students
+project_fhs
+notes

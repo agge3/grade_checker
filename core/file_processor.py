@@ -1,3 +1,4 @@
+import chardet
 import os
 
 
@@ -62,7 +63,7 @@ class FileProcessor:
             if self._fh:
                 self._fh.close()
             self._fh = self._open(file_path)
-            return self._fh
+            return self._fh, self.get_type()
         else:
             # Close the final open file handle (if there is one).
             if self._fh:
@@ -80,9 +81,15 @@ class FileProcessor:
         :return: The file handle.
         """
         try:
-            # Open the file in the given mode (op) and return the file handle
-            fh = open(file_path, self.op)
-            return fh  # Return the file handle so the client can read/write as needed
+            # For `UnicodeDecodeError: 'utf-8' codec can't decode byte 0x95`.
+            # Find encoding first. XXX This is very expensive!
+            encoding = chardet.detect(open(file_path, 'rb').read())['encoding']
+
+            # Then open the file with the client's op mode and a known encoding.
+            # Replace unknown symbols.
+            fh = open(file_path, self.op, encoding=encoding, errors='replace')
+
+            return fh   # Return the file handle.
         except FileNotFoundError as e:
             raise FileNotFoundError(f"File not found: {file_path}") from e
         except PermissionError as e:

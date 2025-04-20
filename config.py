@@ -28,7 +28,8 @@ _config = {}
 def validate():
     """Validates that all necessary keys exist in the _config structure."""
     required_keys = [
-        'milestone', 'class', 'methods', 'options', 'grading', 'extra_credit', 'files'
+        'milestone', 'class', 'methods', 'options', 'grading', 'extra_credit',
+        'files', 'prof', 'org', 'clone', 'glob'
     ]
 
     for key in required_keys:
@@ -42,8 +43,8 @@ def validate():
             if option_key not in _config['options']:
                 raise KeyError(f"Missing option: {option_key}")
 
-    if 'grading' in _config and 'total' not in _config['grading']:
-        raise KeyError("Missing grading key: total")
+    if 'grading' in _config and 'points' not in _config['grading']:
+        raise KeyError("Missing grading key: points")
 
     if 'extra_credit' in _config:
         extra_credit_keys = ['enabled', 'args']
@@ -106,19 +107,7 @@ def merge(milestone):
     _config.update(cfg)
     validate()
 
-def methods_to_strlst():
-    if "methods" not in _config:
-        raise KeyError(
-                f"'methods' key not found in config. Config parsing error."
-        )
 
-    strlst = []
-    for name, decl in _config["methods"].items():
-        ret = decl["return"]
-        para = decl["parameter"]
-        strlst.append(f"{ret} {name}")
-
-    return strlst
 
 def print_config():
     """Prints the global _config dictionary in a formatted way."""

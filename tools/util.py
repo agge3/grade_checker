@@ -38,3 +38,33 @@ def lst_to_str(lst):
         else:
             s += lst[i] + " "
     return s
+
+# CREDIT: OpenAI's ChatGPT
+def fmtout(s: str, width: int = 80, border: str = "#") -> str:
+    """Returns a formatted output string with the parameter string centered."""
+    pad = (width - len(s) - 2) // 2  # Subtract 2 for spaces around the message
+
+    # Construct the header
+    top_bottom = border * width
+    middle = f"{border * pad} {s} {border * pad}".ljust(width, border)
+
+    return f"{top_bottom}\n{middle}\n{top_bottom}"
+
+# Given a config milestone name, return a formatted GitHub(R) URL request
+# version.
+def fmt_milestone(s):
+    return re.sub(r"(\D)(\d+)", r"\1-\2", s) 
+
+def methods_to_strlst(config):
+    if "methods" not in config:
+        raise KeyError(
+                f"'methods' key not found in config. Config parsing error."
+        )
+
+    strlst = []
+    for name, decl in config["methods"].items():
+        ret = decl["return"]
+        para = decl["params"]
+        strlst.append(f"{ret} {name}")
+
+    return strlst

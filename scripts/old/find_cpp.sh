@@ -11,7 +11,8 @@ re=".*"
 for (( i = 1; i < $#; i++ )); do
     re="${re}${!i}[ _-]?"
 done
-re="${re}${!#}\.cpp|cxx|cc)"
+# xxx these OR's might not be working!
+re="${re}${!#}\.(cpp|cxx|cc)"
 
 #echo "Constructed regex pattern: $re"
 

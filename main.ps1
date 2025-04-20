@@ -25,7 +25,7 @@ if (-not $python) {
 
 # Set up the virtual environment.
 $projectPath = Get-Location  # Get the current directory path.
-$venvPath = "$projectPath\.venv"
+$venvPath = "$projectPath\.win-venv"
 
 if (-not (Test-Path -Path $venvPath)) {
     Write-Host "Creating virtual environment at $venvPath"

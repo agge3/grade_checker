@@ -1,0 +1,78 @@
+{
+	"milestone": "milestone2",
+	"prof": "joe",
+	"org": "joe-hui-sfsu",
+	"clone": true,
+	"glob": "hashtable",
+	"class": "HashTable",
+	"methods": {
+	    "getTable": {
+	        "return": "HashNode**",
+	        "params": null
+	    },
+	    "getSize": {
+	        "return": "int",
+	        "params": null
+	    },
+		"calculateHashCode": {
+			"return": "int",
+			"params": [ "int" ]
+		},
+	    "isEmpty": {
+	        "return": "bool",
+	        "params": null
+	    },
+	    "getNumberOfItems": {
+	        "return": "int",
+	        "params": null
+	    },
+	    "add": {
+	        "return": "bool",
+	        "params": [ "int", "HashNode*" ]
+	    },
+	    "remove": {
+	        "return": "bool",
+	        "params": [ "int" ]
+	    },
+	    "clear": {
+	        "return": "void",
+	        "params": null
+	    },
+	    "getItem": {
+	        "return": "HashNode*",
+	        "params": [ "int" ]
+	    },
+	    "contains": {
+	        "return": "bool",
+	        "params": [ "int" ]
+	    },
+		"printTable": {
+			"return": "void",
+			"params": null
+		}
+	},
+    "options": {
+		"os" : "nix",
+		"build": false,
+		"output": true
+	},
+    "grading": {
+    	"points": 50,
+		"headers": 11,
+		"methods": 11
+    },
+    "extra_credit": {
+    	"enabled": true,
+    	"args": [ "gtest" ]
+    },
+	"fetch": {
+		"clear": true
+	},
+	"scripts": [
+		"check-static.sh",
+		"check-ec.sh"
+	],
+	"files": [
+		"milestone2.json"
+	]
+}
