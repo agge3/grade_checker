@@ -3,7 +3,7 @@
 	"prof": "hugh",
 	"org": "SFSU-CSC-340-3",
 	"clone": true,
-	"glob": "hashtable",
+	"glob": "hash-table",
 	"class": "HashTable",
 	"methods": {
 	    "getTable": {
@@ -53,8 +53,10 @@
 	},
     "options": {
 		"os" : "nix",
-		"build": false,
-		"output": true
+		"build": true,
+		"check_build": false,
+		"output": true,
+		"copy": true
 	},
     "grading": {
     	"points": 50,

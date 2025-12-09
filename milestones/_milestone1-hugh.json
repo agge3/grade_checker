@@ -6,63 +6,58 @@
 	"glob": "doubly-linked-list",
 	"class" : "DoublyLinkedList",
 	"methods": {
+	    "isEmpty": {
+	        "return": "bool",
+	        "params": null
+	    },
 	    "insertAtHead": {
 	        "return": "void",
-	        "parameter": null
+	        "params": ["int"]
 	    },
 	    "insertAtTail": {
 	        "return": "void",
-	        "parameter": null
+			"params": ["int"]
 	    },
-	    "findNode": {
-	        "return": "Node*",
-	        "parameter": null
-	    },
-	    "deleteNode": {
+		"remove": {
+			"return": "void",
+			"params": ["int"]
+		},
+
+	    "removeHeaderNode": {
 	        "return": "void",
-	        "parameter": null
+	        "params": null
 	    },
-	    "moveToHead": {
+	    "removeTailNode": {
 	        "return": "void",
-	        "parameter": null
+	        "params": null
 	    },
-	    "moveToTail": {
-	        "return": "void",
-	        "parameter": null
-	    },
-	    "deleteHeadNode": {
-	        "return": "void",
-	        "parameter": null
-	    },
-	    "deleteTailNode": {
-	        "return": "void",
-	        "parameter": null
-	    },
+		"moveNodeToHead": {
+			"return": "void",
+			"params": ["int"]
+		},
+		"moveNodeToTail": {
+			"return": "void",
+			"params": ["int"]
+		},
+		"clear": {
+			"return": "void",
+			"params": null
+		},
 	    "printList": {
 	        "return": "void",
-	        "parameter": null
+	        "params": null
 	    },
 	    "reversePrintList": {
 	        "return": "void",
-	        "parameter": null
-	    },
-	    "deleteList": {
-	        "return": "void",
-	        "parameter": null
-	    },
-	    "toVector": {
-	        "return": "IntVector*",
-	        "parameter": null
-	    },
-	    "toReverseVector": {
-	        "return": "IntVector*",
-	        "parameter": null
+	        "params": null
 	    }
 	},
 	"options": {
 		"os" : "nix",
-		"build": false,
-		"output": true
+		"build": true,
+		"check_build": true,
+		"output": true,
+		"copy": true
 	},
     "grading": {
 		"points": 50,
@@ -73,8 +68,8 @@
 		"clear": true
 	},
     "extra_credit": {
-      "enabled": false,
-      "args": []
+      "enabled": true,
+      "args": ["gtest"]
     },
 	"script": [
 		"check-static.sh"

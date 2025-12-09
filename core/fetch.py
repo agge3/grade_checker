@@ -39,9 +39,12 @@ class Fetcher:
 
     def _init_timestamp(self, date):
         # datetime(year, month, day)
-        # xxx push into json config
+        date_env = os.getenv('FETCH_DATE')
         self._mindate = date
-        self._push_mindate = datetime(2025, 2, 27)
+        if not date_env:
+            self._push_mindate = date
+        else:
+            self._push_mindate = datetime.strptime(date_env, '%Y-%m-%d')
 
     def _init_req(self):
         self._auth = (os.getenv('USERNAME'), os.getenv('PAT'))

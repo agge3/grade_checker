@@ -16,7 +16,7 @@ class Build:
         self._milestone = milestone
         print(f'Build:\tmilestone:\t{self._milestone}')
 
-        self._pmilestone = self._milestone + f'_{self._config['prof']}'
+        self._pmilestone = self._milestone + f'-{self._config['prof']}'
         print(f'Build:\tprofessor milestone:\t{self._pmilestone}')
 
         # Relative.
@@ -25,8 +25,13 @@ class Build:
         self._fhs = self._init_fhs()
 
         self._missing = []
-        self._cfgfhs_path = f"milestones/{self._pmilestone}_fhs/"
+        self._cfgfhs_path = f"project_fhs/{self._pmilestone}"
         print(f'Build:\tconfig files path:\t{self._cfgfhs_path}')
+
+        self._force_incl = []
+        
+        if self._milestone == "milestone4":
+            self._force_incl = ['milestone4.json', 'milestone4_config.json']
 
         # Windows case:
         if util.is_windows():
@@ -59,7 +64,7 @@ class Build:
 
     def _check_fhs(self):
         for fh in os.listdir(self._cfgfhs_path):
-            if fh in self._fhs:
+            if fh in self._fhs and fh not in self._force_incl:
                 continue
             if re.match(r"^ignore-.*", fh):
                 continue

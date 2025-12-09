@@ -68,8 +68,7 @@ def main():
 
     args = parser.parse_args()
 
-    # xxx we're capturing `.json` too, but we don't really need too...
-    #reg = re.search(r"^(\w+)-.*(.json)$", args.milestone)
+    # EXPECTS: _milestoneX-hugh.json
     reg = re.search(r"^(\w+)-.*$", args.milestone)
     milestone = reg[1]  # expected output: milestoneX
 

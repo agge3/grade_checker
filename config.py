@@ -28,7 +28,7 @@ _config = {}
 def validate():
     """Validates that all necessary keys exist in the _config structure."""
     required_keys = [
-        'milestone', 'class', 'methods', 'options', 'grading', 'extra_credit',
+        'milestone', 'classes', 'methods', 'options', 'grading', 'extra_credit',
         'files', 'prof', 'org', 'clone', 'glob'
     ]
 
@@ -54,6 +54,23 @@ def validate():
 
     if 'files' in _config and not isinstance(_config['files'], list):
         raise TypeError("Files should be a list")
+
+    # Validate methods structure (object with class keys)
+    if 'methods' in _config:
+        if not isinstance(_config['methods'], dict):
+            raise TypeError("Methods should be a dict mapping classes to their methods")
+        
+        # Validate each class has method definitions
+        for clazz, methods in _config['methods'].items():
+            if not isinstance(methods, dict):
+                raise TypeError(f"Methods for class '{clazz}' should be a dict")
+            
+            # Validate each method has required fields
+            for method_name, method_def in methods.items():
+                if 'return' not in method_def:
+                    raise KeyError(f"Method '{method_name}' in class '{clazz}' missing 'return' key")
+                if 'params' not in method_def:
+                    raise KeyError(f"Method '{method_name}' in class '{clazz}' missing 'params' key")
 
 def merge(milestone):
     """Merges the milestone configuration into the global _config."""

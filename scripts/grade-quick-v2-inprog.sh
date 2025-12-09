@@ -22,11 +22,10 @@ copy_project_fhs()
 
 project_fhs="project_fhs"
 
-copy_project_fhs ${project_fhs}
+#copy_project_fhs ${project_fhs}
 
 cpp_fhs=(
 	'doubly linked list'
-	'generate output'
 )
 
 methods=(
@@ -151,11 +150,109 @@ print_header "BUILD END"
 printf "\n"
 
 test_out=(
-	"List after testCase5:
-88 80 10 10000 50 
-Reverse List after testCase5:
-50 10000 10 80 88"
-	
+Processing testCase1
+Here are the List contents:
+Node key: 10
+Node key: 20
+Node key: 30
+Node key: 40
+Node key: 50
+Node key: 60
+Node key: 70
+Node key: 80
+Node key: 90
+Node key: 100
+End of List
+
+Here are the List contents reversed:
+Node key: 100
+Node key: 90
+Node key: 80
+Node key: 70
+Node key: 60
+Node key: 50
+Node key: 40
+Node key: 30
+Node key: 20
+Node key: 10
+End of List	
+
+Successfully processed: testCase1
+Processing testCase2
+Here are the List contents:
+Node key: 1000
+Node key: 80
+Node key: 50
+Node key: 40
+End of List
+
+Here are the List contents reversed:
+Node key: 40
+Node key: 50
+Node key: 80
+Node key: 1000
+End of List
+
+Successfully processed: testCase2
+
+Processing testCase3
+
+Here are the List contents:
+Node key: 1000
+Node key: 180
+Node key: 80
+Node key: 40
+End of List
+
+Here are the List contents reversed:
+Node key: 40
+Node key: 80
+Node key: 180
+Node key: 1000
+End of List
+
+Successfully processed: testCase3
+
+Processing testCase4
+
+Here are the List contents:
+Node key: 100
+Node key: 1000
+Node key: 70
+Node key: 10
+Node key: 40
+End of List
+
+Here are the List contents reversed:
+Node key: 40
+Node key: 10
+Node key: 70
+Node key: 1000
+Node key: 100
+End of List
+
+Successfully processed: testCase4
+
+Processing testCase5
+
+Here are the List contents:
+Node key: 88
+Node key: 80
+Node key: 10
+Node key: 10000
+Node key: 50
+End of List
+
+Here are the List contents reversed:
+Node key: 50
+Node key: 10000
+Node key: 10
+Node key: 80
+Node key: 88
+End of List
+
+Successfully processed: testCase5
+
 	"List after testCase4:
 100 1000 70 10 40 
 Reverse List after testCase4:

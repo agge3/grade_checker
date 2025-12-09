@@ -10,3 +10,9 @@ repos
 students
 project_fhs
 notes
+submissions*
+*.zip
+frozen*
+frozen
+png
+tmp

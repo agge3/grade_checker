@@ -1,0 +1,109 @@
+{
+	"milestone": "milestone4",
+	"prof": "joe",
+	"org": "joe-hui-sfsu",
+	"clone": true,
+	"glob": "binary-search-tree",
+	"class": "BinarySearchTree",
+	"methods": {
+	    "addToTree": {
+	        "return": "void",
+	        "params": ["int"]
+	    },
+	    "removeNode": {
+	        "return": "bool",
+	        "params": ["int"]
+	    },
+		"getHeightOfTree": {
+			"return": "int",
+			"params": null
+		},
+	    "getNumberOfTreeNodes": {
+	        "return": "int",
+	        "params": null
+	    },
+	    "contains": {
+	        "return": "bool",
+	        "params": ["int"]
+	    },
+	    "getRoot": {
+	        "return": "TreeNode*",
+	        "params": null
+	    },
+	    "isEmpty": {
+	        "return": "bool",
+	        "params": null
+	    },
+	    "clear": {
+	        "return": "void",
+	        "params": null
+	    },
+	    "printNodeFromTree": {
+	        "return": "void",
+	        "params": ["TreeNode*"]
+	    },
+		"printInOrder": {
+			"return": "void",
+			"params": null
+		},
+		"printPreOrder": {
+			"return": "void",
+			"params": null
+		},
+		"printPostOrder": {
+			"return": "void",
+			"params": null
+		},
+		"printDepthFirst": {
+			"return": "void",
+			"params": null
+		},
+		"printBreadthFirst": {
+			"return": "void",
+			"params": null
+		},
+		"deleteTree": {
+			"return": "void",
+			"params": ["TreeNode*"]
+		},
+		"getHeight": {
+			"return": "int",
+			"params": ["TreeNode*"]
+		},
+		"printInOrderHelper": {
+			"return": "void",
+			"params": ["TreeNode*"]
+		},
+		"printPreOrderHelper": {
+			"return": "void",
+			"params": ["TreeNode*"]
+		},
+		"printPostOrderHelper": {
+			"return": "void",
+			"params": ["TreeNode*"]
+		}
+	},
+    "options": {
+		"os" : "nix",
+		"build": false,
+		"output": true
+	},
+    "grading": {
+    	"points": 50,
+		"headers": 11,
+		"methods": 11
+    },
+	"fetch": {
+		"clear": false
+	},
+    "extra_credit": {
+    	"enabled": true,
+    	"args": [ "gtest" ]
+    },
+	"scripts": [
+		"check-static.sh"
+	],
+	"files": [
+		"milestone4.json"
+	]
+}

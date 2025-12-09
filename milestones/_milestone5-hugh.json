@@ -1,10 +1,10 @@
 {
-	"milestone": "milestone3",
+	"milestone": "milestone5",
 	"prof": "hugh",
 	"org": "SFSU-CSC-340-3",
 	"clone": true,
-	"glob": "cache-manager",
-	"classes": ["DoublyLinkedList", "HashTable", "CacheManager" ],
+	"glob": "cachemanager-bst",
+	"classes": ["DoublyLinkedList", "HashTable", "CacheManager", "BinarySearchTree" ],
 	"methods": {
 		"DoublyLinkedList": {
 			"getSize": {
@@ -112,6 +112,10 @@
 	    	    "return": "DoublyLinkedList*",
 	    	    "params": null
 	    	},
+			"getBst": {
+				"return": "BinarySearchTree*",
+				"params": null
+			},
 			"getSize": {
 				"return": "int",
 				"params": null
@@ -147,6 +151,108 @@
 			"printCache": {
 				"return": "void",
 				"params": null
+			},
+			"printRange": {
+				"return": "void",
+				"params": ["int", "int"]
+			},
+			"printSort": {
+				"return": "void",
+				"params": ["bool"]
+			}
+		},
+		"BinarySearchTree": {
+	    	"addToTree": {
+	    	    "return": "void",
+	    	    "params": ["int"]
+	    	},
+	    	"removeNode": {
+	    	    "return": "bool",
+	    	    "params": ["int"]
+	    	},
+			"getHeightOfTree": {
+				"return": "int",
+				"params": null
+			},
+	    	"getNumberOfTreeNodes": {
+	    	    "return": "int",
+	    	    "params": null
+	    	},
+	    	"contains": {
+	    	    "return": "bool",
+	    	    "params": ["int"]
+	    	},
+	    	"getRoot": {
+	    	    "return": "TreeNode*",
+	    	    "params": null
+	    	},
+	    	"isEmpty": {
+	    	    "return": "bool",
+	    	    "params": null
+	    	},
+	    	"clear": {
+	    	    "return": "void",
+	    	    "params": null
+	    	},
+	    	"printNodeFromTree": {
+	    	    "return": "void",
+	    	    "params": ["TreeNode*"]
+	    	},
+			"printInOrder": {
+				"return": "void",
+				"params": null
+			},
+			"printReverseOrder": {
+				"return": "void",
+				"params": null
+			},
+			"printPreOrder": {
+				"return": "void",
+				"params": null
+			},
+			"printPostOrder": {
+				"return": "void",
+				"params": null
+			},
+			"printDepthFirst": {
+				"return": "void",
+				"params": null
+			},
+			"printBreadthFirst": {
+				"return": "void",
+				"params": null
+			},
+			"printRange": {
+				"return": "void",
+				"params": ["int", "int"]
+			},
+			"deleteTree": {
+				"return": "void",
+				"params": ["TreeNode*"]
+			},
+			"getHeight": {
+				"return": "int",
+				"params": ["TreeNode*"]
+			},
+			"printInOrderHelper": {
+				"return": "void",
+				"params": ["TreeNode*"]
+			},
+			"printReverseOrderHelper": {
+				"return": "void",
+				"params": ["TreeNode*"]
+			},
+			"printPreOrderHelper": {
+				"return": "void",
+				"params": ["TreeNode*"]
+			},
+			"printPostOrderHelper": {
+				"return": "void",
+				"params": ["TreeNode*"]
+			},
+			"printRangeHelper": {
+				"return": "void",
+				"params": ["TreeNode*", "int", "int"]
 			}
 		}
 	},
@@ -173,6 +279,6 @@
 		"check-static.sh"
 	],
 	"files": [
-		"milestone3.json"
+		"milestone5.json"
 	]
 }

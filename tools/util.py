@@ -55,16 +55,20 @@ def fmtout(s: str, width: int = 80, border: str = "#") -> str:
 def fmt_milestone(s):
     return re.sub(r"(\D)(\d+)", r"\1-\2", s) 
 
+# Returns dictionary of classes, with class as key and string list of methods
+# as value.
 def methods_to_strlst(config):
     if "methods" not in config:
         raise KeyError(
                 f"'methods' key not found in config. Config parsing error."
         )
 
-    strlst = []
-    for name, decl in config["methods"].items():
-        ret = decl["return"]
-        para = decl["params"]
-        strlst.append(f"{ret} {name}")
+    strlst = {}
+    for clazz, items in config["methods"].items():
+        strlst[clazz] = []
+        for name, decl in items.items():
+            ret = decl["return"]
+            para = decl["params"]
+            strlst[clazz].append(f"{ret} {name}")
 
     return strlst
