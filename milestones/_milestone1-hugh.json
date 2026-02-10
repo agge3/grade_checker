@@ -4,53 +4,55 @@
 	"org": "SFSU-CSC-340-3",
 	"clone": true,
 	"glob": "doubly-linked-list",
-	"class" : "DoublyLinkedList",
+	"classes" : "DoublyLinkedList",
 	"methods": {
-	    "isEmpty": {
-	        "return": "bool",
-	        "params": null
-	    },
-	    "insertAtHead": {
-	        "return": "void",
-	        "params": ["int"]
-	    },
-	    "insertAtTail": {
-	        "return": "void",
-			"params": ["int"]
-	    },
-		"remove": {
-			"return": "void",
-			"params": ["int"]
-		},
+		"DoublyLinkedList": {
+	    	"isEmpty": {
+	    	    "return": "bool",
+	    	    "params": null
+	    	},
+	    	"insertAtHead": {
+	    	    "return": "void",
+	    	    "params": ["int"]
+	    	},
+	    	"insertAtTail": {
+	    	    "return": "void",
+				"params": ["int"]
+	    	},
+			"remove": {
+				"return": "void",
+				"params": ["int"]
+			},
 
-	    "removeHeaderNode": {
-	        "return": "void",
-	        "params": null
-	    },
-	    "removeTailNode": {
-	        "return": "void",
-	        "params": null
-	    },
-		"moveNodeToHead": {
-			"return": "void",
-			"params": ["int"]
-		},
-		"moveNodeToTail": {
-			"return": "void",
-			"params": ["int"]
-		},
-		"clear": {
-			"return": "void",
-			"params": null
-		},
-	    "printList": {
-	        "return": "void",
-	        "params": null
-	    },
-	    "reversePrintList": {
-	        "return": "void",
-	        "params": null
-	    }
+	    	"removeHeaderNode": {
+	    	    "return": "void",
+	    	    "params": null
+	    	},
+	    	"removeTailNode": {
+	    	    "return": "void",
+	    	    "params": null
+	    	},
+			"moveNodeToHead": {
+				"return": "void",
+				"params": ["int"]
+			},
+			"moveNodeToTail": {
+				"return": "void",
+				"params": ["int"]
+			},
+			"clear": {
+				"return": "void",
+				"params": null
+			},
+	    	"printList": {
+	    	    "return": "void",
+	    	    "params": null
+	    	},
+	    	"reversePrintList": {
+	    	    "return": "void",
+	    	    "params": null
+	    	}
+		}
 	},
 	"options": {
 		"os" : "nix",
