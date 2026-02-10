@@ -63,7 +63,7 @@ class Fetcher:
         if path != '':
             self._path = path
         else:
-            self._path = f'repos/{self._pmilestone}' 
+            self._path = f'repos/{self._pmilestone}'
 
     def fetch(self):
         if self._config['fetch']['clear']:
@@ -78,14 +78,16 @@ class Fetcher:
             response = requests.get(self._url, headers=self._headers,
                                     params={'page' : page})
             if response.status_code != 200:
+                print(f"bad response status code: {response.status_code}")
                 break
 
             repos = response.json()
             if not repos:
+                print(f"no json response")
                 break
 
             for repo in repos:
-                # Skip repos that are older than our specified minimum 
+                # Skip repos that are older than our specified minimum
                 # year/month.
                 created_at = datetime.strptime(repo['created_at'],
                                                "%Y-%m-%dT%H:%M:%SZ")
@@ -100,7 +102,7 @@ class Fetcher:
 
                 if (pushed_at < self._push_mindate):
                     continue
-                
+
                 print(f'Fetcher:\tfetch:\tpushed_at after:\t{pushed_at}')
 
                 if fnmatch.fnmatch(repo['name'], self._glob):
