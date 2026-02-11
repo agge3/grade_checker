@@ -1,10 +1,10 @@
 {
 	"milestone" : "milestone1",
 	"prof": "hugh",
-	"org": "SFSU-CSC-340-3",
+	"org": "SFSU-CSC340-00",
 	"clone": true,
 	"glob": "doubly-linked-list",
-	"classes" : "DoublyLinkedList",
+	"classes": ["DoublyLinkedList"],
 	"methods": {
 		"DoublyLinkedList": {
 	    	"isEmpty": {
@@ -57,7 +57,7 @@
 	"options": {
 		"os" : "nix",
 		"build": true,
-		"check_build": true,
+		"check_build": false,
 		"output": true,
 		"copy": true
 	},

@@ -4,7 +4,7 @@
 	"org": "SFSU-CSC-340-3",
 	"clone": true,
 	"glob": "cache-manager",
-	"classes": ["DoublyLinkedList", "HashTable", "CacheManager" ],
+	"classes": ["DoublyLinkedList", "HashTable", "CacheManager"],
 	"methods": {
 		"DoublyLinkedList": {
 			"getSize": {

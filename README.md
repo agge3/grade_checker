@@ -35,6 +35,9 @@ python main.py milestone${num}-${prof} -f
 # different config expansions
 ```
 
+#### update to new org
+update in .env and update per milestone in milestones/_milestone${num}-${prof}
+
 ### grade and report:
 ```bash
 rm -rvf repos/milestone${num}   # clear old reports

@@ -16,3 +16,4 @@ frozen*
 frozen
 png
 tmp
+**/*.DS_Store

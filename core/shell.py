@@ -53,6 +53,8 @@ class Shell:
             result = subprocess.run(f"{self._bash} -c \"{cmd}\"",
                                     capture_output=True, text=True)
         else:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            result = subprocess.run(cmd, shell=True, capture_output=True,
+                                    text=True, encoding='utf-8',
+                                    errors='replace')
 
         return result.stdout, result.stderr, result.returncode

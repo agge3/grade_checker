@@ -365,6 +365,10 @@ class Grader:
                 for fh, ftype in processor:
                     lines = fh.readlines()
 
+                    if not lines:
+                        print("WARNING: empty file. skipping...")
+                        continue
+
                     #cap_headers.append(util.fmtout(f"{fh.name} HEADER"))
 
                     # If file doesn't contain beginning comment block, it doesn't have

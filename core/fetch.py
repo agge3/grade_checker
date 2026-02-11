@@ -86,6 +86,8 @@ class Fetcher:
                 print(f"no json response")
                 break
 
+            print(response)
+
             for repo in repos:
                 # Skip repos that are older than our specified minimum
                 # year/month.
