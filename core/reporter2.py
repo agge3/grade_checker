@@ -60,6 +60,10 @@ class Reporter2:
         self.repos = []
         print("Reporter: _set_config: Building repository list...")
         for dir in os.listdir(self._repo_root):
+            if dir.startswith("."):
+                print(f"{self._name}: INFO: skipping dotfile: '{dir}'...")
+                continue
+
             print(f"Reporter: _set_config: Appended repository: {dir}.")
             self.repos.append(dir)
 
