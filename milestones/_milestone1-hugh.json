@@ -4,6 +4,7 @@
 	"org": "SFSU-CSC340-00",
 	"clone": true,
 	"glob": "doubly-linked-list",
+	"usernames_file": "",
 	"classes": ["DoublyLinkedList"],
 	"methods": {
 		"DoublyLinkedList": {
