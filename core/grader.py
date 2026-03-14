@@ -27,6 +27,7 @@ cpp_headers = False
 
 class Grader:
     def __init__(self, milestone, config, path=""):
+        self._name = self.__class__.__name__
         self._shell = Shell()
         self._milestone = milestone
         self._config = config
@@ -50,12 +51,10 @@ class Grader:
         }
 
     def _init(self):
-        self.files = self._get_files()
+        self.files = util.get_files(self.clazzes, self._path)
 
-        # xxx not really necessary as there will simply be no file output if
-        # they don't exist!
-        #if not util.check_files(self.files):
-        #    # xxx log
+        # xxx check is bad, and do we need? it's redundant
+        #if not self.files or not util.check_files(self.files):
         #    print(f"Grader was unable to find files: {self.files}. Exiting...")
         #    sys.exit(1)
 
@@ -182,7 +181,10 @@ class Grader:
                 processor = FileProcessor(self.files["cpp"][clazz], 'r')
                 for fh, ftype in processor:
                     lines = fh.readlines()
-                    #print(lines)
+                    end = util.find_header(lines, fh.name)
+                    # strip header if it exists
+                    if end > 0:
+                        lines = lines[end + 1:]
                     for idx, line in enumerate(lines):
                         #print(line)
                         for fn, visited in self._func_cpp[clazz].items():
@@ -193,31 +195,39 @@ class Grader:
 
                                 self._func_cpp[clazz][fn] = True
 
-                                inline = lambda l: (
+                                find_comment = lambda l: (
                                     re.search(r"//", l) or
-                                    (re.search(r"/\*", l) and re.search(r"\*/", l))
-                                    # xxx could capture `/* .* */`
+                                    re.search(r"/\*", l) or
+                                    re.search(r"\*/", l)
                                 )
 
-                                if ("*/" in lines[idx - 1] or "//" in lines[idx - 1] or
-                                    inline(line)):
-                                    self._cpp_comments[clazz][fn] = True
+                                comment_idx = idx
+                                comment_line = lines[comment_idx]
+                                COMMENT_DIFF_THRESHOLD = 5
+                                while ("}" not in comment_line and
+                                    idx - comment_idx < COMMENT_DIFF_THRESHOLD and
+                                    comment_idx >= 0):
+                                    if find_comment(comment_line):
+                                        self._cpp_comments[clazz][fn] = True
+                                        print(
+                                            f"Grader: check_func: FOUND method header in "
+                                            f"{fh.name} for {fn}."
+                                        )
+                                        print(
+                                            f"Grader: check_func: Method header line "
+                                            f"in {fh.name} at lines[{comment_idx}] "
+                                            f"(diff from definition: {idx - comment_idx}): "
+                                            f"{comment_line.strip()}."
+                                        )
+                                        break
+                                    comment_idx = comment_idx - 1
+                                    comment_line = lines[comment_idx]
+                                if not self._cpp_comments[clazz][fn]:
                                     print(
-                                        f"Grader: check_func: FOUND method header in "
-                                        f"{fh.name} for {fn}."
+                                        f"{self._name}: check_func: Method header line "
+                                        f"not found! Exceeded COMMENT_DIFF_THRESHOLD: "
+                                        f"{COMMENT_DIFF_THRESHOLD}"
                                     )
-                                    if inline(line):
-                                        print(
-                                            f"Grader: check_func: Method header line "
-                                            f"in {fh.name} at lines[{idx}]: "
-                                            f"{line.strip()}."
-                                        )
-                                    else:
-                                        print(
-                                            f"Grader: check_func: Method header line "
-                                            f"in {fh.name} at lines[{idx - 1}: "
-                                            f"{lines[idx - 1].strip()}."
-                                        )
 
                     for e in self._func_cpp[clazz].items():
                         if not e[1]:
@@ -336,6 +346,7 @@ class Grader:
         return parsed_dates  # Return the list of valid dates
 
 
+
     def check_headers(self, points):
         # xxx return total points
 
@@ -369,48 +380,24 @@ class Grader:
                         print("WARNING: empty file. skipping...")
                         continue
 
-                    #cap_headers.append(util.fmtout(f"{fh.name} HEADER"))
-
-                    # If file doesn't contain beginning comment block, it doesn't have
-                    # a header.
-                    if ("/**" or "//" or "/*") not in lines[0]:
+                    end = util.find_header(lines, fh.name)
+                    if end < 0:
                         headers[ftype] = False
-                        print(
-                            f"lines[0] did not contain a comment starting block in "
-                            f"{fh.name}."
-                        )
-                        output[clazz]['no_header'] = (
-                            f"lines[0] did not contain a comment starting block in "
-                            f"{fh.name}."
-                        )
+                        match end:
+                            case -1:
+                                output[clazz]['no_header'] = (
+                                    f"lines[0] did not contain a comment starting block in "
+                                    f"{fh.name}."
+                                )
+                            case -2:
+                                output[clazz]['malformed_header'] = (
+                                    f"Malformed comment block in {fh.name}."
+                                )
+                            case _:
+                                output[clazz]['malformed_header'] = (
+                                    f"ERROR: unknown failure from find_header in {fh.name}."
+                                )
                         continue
-                    else:
-                        print(f"Found header comment starting block.")
-
-                    # Find the end of the comment block.
-                    #end = "".join(lines).find("*/") or "".join(lines).find("\n")
-                    end = next(
-                        (i for i, line in enumerate(lines)
-                        if line.strip() == "" or "*/" in line),
-                        -1
-                    )
-                    # Sanity check: Header shouldn't be longer than 25 lines.
-                    if end > 25:
-                        end -1
-
-                    if end == -1:
-                        # Malformed comment block.
-                        print(
-                            f"Malformed comment block in {fh.name}."
-                        )
-                        output[clazz]['malformed_header'] = (
-                            f"Malformed comment block in {fh.name}."
-                        )
-                        headers[ftype] = False
-                        continue
-                    else:
-                        print(f"Header comment block is not malformed.")
-                        print(f"Header starts on lines[0] and ends on lines[{end}].")
 
                     # Extract the header content.
                     for i in range(0, end + 1):

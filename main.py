@@ -13,7 +13,7 @@ from core.shell import Shell
 from core.build import Build
 from core.fetch import Fetcher
 from core.grader import Grader
-from core.reporter2 import Reporter2
+from core.reporter import Reporter
 
 import argparse
 import re
@@ -65,6 +65,11 @@ def main():
                         help="Grade fetched repos.")
     parser.add_argument("-r", "--report", action="store_true",
                         help="Grade and report fetched repos.")
+    parser.add_argument("-p", "--plagiarism", action="store_true", help=(
+                            "Check fetched repos for plagiarism "
+                            "(SEE: _milestoneX for configuring line-stripped "
+                            "or raw files for plagiarism check"
+                        ))
 
     args = parser.parse_args()
 
@@ -84,11 +89,11 @@ def main():
 
         name = ""   # pwd and regex capture project root
         score = config._config["grading"]["total"]
-        
+
         if config._config["options"]["build"]:
             build = Build()
             out, res = build.make_run()
-            
+
             if not res:
                 score -= config._config["grading"]["build"]
                 print("Build unsuccessful. Report:")
@@ -113,15 +118,15 @@ def main():
 
     if args.report:
         print("main: Entered Reporter.")
-        reporter = Reporter2(milestone, config._config)
+        reporter = Reporter(milestone, config._config)
         reporter._report()
         reporter.report()
         # xxx we always build. keep track of what's already built to not build
         # again.
 
-
-
-        
+    if args.plagiarism:
+        print("main: Entered plagiarism.")
+        plagiarism = Plagiarism()
 
 
 

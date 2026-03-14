@@ -1,3 +1,4 @@
+
 from tools import util
 
 import os
@@ -5,16 +6,19 @@ import subprocess
 import shutil
 import sys
 
-
 class Shell:
     def __init__(self):
         self._os = os.name
         self._bash = self._get_bash_path()
         self._check_dep()
 
+    def _is_windows(self):
+        """ Check if the OS is Windows. """
+        return os.name == "nt"
+
     def _get_bash_path(self):
         """ Find the appropriate bash executable depending on the OS. """
-        if util.is_windows():
+        if self._is_windows():
             return self._get_git_bash_path()
         return "/usr/bin/env bash"
 
@@ -47,7 +51,7 @@ class Shell:
         Run a shell command.
         On Windows, use Git Bash if specified; otherwise, run normally.
         """
-        if util.is_windows():
+        if self._is_windows():
             # Wrap the command for Git Bash compatibility.
             # xxx why do we need to join here?
             result = subprocess.run(f"{self._bash} -c \"{cmd}\"",
@@ -58,3 +62,7 @@ class Shell:
                                     errors='replace')
 
         return result.stdout, result.stderr, result.returncode
+
+# singleton upon module import
+# xxx refactor all class instantiations to be the singleton
+shell = Shell()

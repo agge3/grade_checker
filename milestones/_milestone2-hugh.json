@@ -1,54 +1,56 @@
 {
 	"milestone": "milestone2",
 	"prof": "hugh",
-	"org": "SFSU-CSC-340-3",
+	"org": "SFSU-CSC340-00",
 	"clone": true,
 	"glob": "hash-table",
-	"class": "HashTable",
+	"classes": ["HashTable"],
 	"methods": {
-	    "getTable": {
-	        "return": "HashNode**",
-	        "params": null
-	    },
-	    "getSize": {
-	        "return": "int",
-	        "params": null
-	    },
-		"calculateHashCode": {
-			"return": "int",
-			"params": [ "int" ]
-		},
-	    "isEmpty": {
-	        "return": "bool",
-	        "params": null
-	    },
-	    "getNumberOfItems": {
-	        "return": "int",
-	        "params": null
-	    },
-	    "add": {
-	        "return": "bool",
-	        "params": [ "int", "HashNode*" ]
-	    },
-	    "remove": {
-	        "return": "bool",
-	        "params": [ "int" ]
-	    },
-	    "clear": {
-	        "return": "void",
-	        "params": null
-	    },
-	    "getItem": {
-	        "return": "HashNode*",
-	        "params": [ "int" ]
-	    },
-	    "contains": {
-	        "return": "bool",
-	        "params": [ "int" ]
-	    },
-		"printTable": {
-			"return": "void",
-			"params": null
+		"HashTable": {
+	    	"getTable": {
+	    	    "return": "HashNode**",
+	    	    "params": null
+	    	},
+	    	"getSize": {
+	    	    "return": "int",
+	    	    "params": null
+	    	},
+			"calculateHashCode": {
+				"return": "int",
+				"params": [ "int" ]
+			},
+	    	"isEmpty": {
+	    	    "return": "bool",
+	    	    "params": null
+	    	},
+	    	"getNumberOfItems": {
+	    	    "return": "int",
+	    	    "params": null
+	    	},
+	    	"add": {
+	    	    "return": "bool",
+	    	    "params": [ "int", "HashNode*" ]
+	    	},
+	    	"remove": {
+	    	    "return": "bool",
+	    	    "params": [ "int" ]
+	    	},
+	    	"clear": {
+	    	    "return": "void",
+	    	    "params": null
+	    	},
+	    	"getItem": {
+	    	    "return": "HashNode*",
+	    	    "params": [ "int" ]
+	    	},
+	    	"contains": {
+	    	    "return": "bool",
+	    	    "params": [ "int" ]
+	    	},
+			"printTable": {
+				"return": "void",
+				"params": null
+			}
 		}
 	},
     "options": {

@@ -1,3 +1,5 @@
+# xxx use pandas to populate spreadsheet. broken, but this is the end goal
+
 import pandas as pd
 
 inpath = "input.xlsx"
@@ -27,5 +29,5 @@ def main(path):
     writer.close()
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
     main()

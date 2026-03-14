@@ -57,7 +57,7 @@
 	"options": {
 		"os" : "nix",
 		"build": true,
-		"check_build": false,
+		"check_build": true,
 		"output": true,
 		"copy": true
 	},
@@ -68,6 +68,11 @@
     },
 	"fetch": {
 		"clear": true
+	},
+	"plagiarism": {
+		"strip": true,
+		"raw": true,
+		"threshold": 0.80
 	},
     "extra_credit": {
       "enabled": true,

@@ -29,7 +29,7 @@ class Build:
         print(f'Build:\tconfig files path:\t{self._cfgfhs_path}')
 
         self._force_incl = []
-        
+
         if self._milestone == "milestone4":
             self._force_incl = ['milestone4.json', 'milestone4_config.json']
 
@@ -55,7 +55,7 @@ class Build:
             self.buildfh = "CMakeLists.txt"
             self.cmd = "mkdir build && cd build && cmake .. && cmake --build ."
 
-    def _init_fhs(self): 
+    def _init_fhs(self):
         fhs = []
         for fh in os.listdir(self._repo_path):
             fhs.append(fh)
@@ -145,7 +145,7 @@ class Build:
         stdout, stderr, code = self._shell.cmd(
 	        f"rm -rf {self._repo_path}/build && " +
 	        f"mkdir -p {self._repo_path}/build && " +
-	        f"cd {self._repo_path}/build && " + 
+	        f"cd {self._repo_path}/build && " +
 	        f"cmake .. && " +
 	        f"make all && " +
             f"./{exec} && " +
@@ -192,26 +192,26 @@ class Build:
             r"C:\Program Files",
         ]
         exec_name = "msbuild.exe"
-    
+
         # Search through the directories
         for root_dir in search_dirs:
             for root, dirs, files in os.walk(root_dir):
                 if exec_name in files:
                     return os.path.join(root, exec_name)
-        
+
         # Fallback to check system PATH
         for path in os.getenv("PATH", "").split(os.pathsep):
             msbuild_path = os.path.join(path, exec_name)
             if os.path.isfile(msbuild_path):
                 return msbuild_path
-    
+
         raise FileNotFoundError("msbuild.exe not found on this system.")
 
     # For Windows API.
     def _find_sln_path(self):
         """ Find the .sln file on Windows. """
         search_command = 'findstr /S /I ".sln" *'
-    
+
         try:
             res = subprocess.run(
                 search_command,

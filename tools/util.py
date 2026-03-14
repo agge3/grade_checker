@@ -1,5 +1,10 @@
 import os
 import re
+from tools.logger import MyLogger
+from core.shell import shell
+
+
+logger = MyLogger.create(os.path.basename(__file__))
 
 
 def is_windows():
@@ -15,7 +20,7 @@ def check_files(files):
 
 def check_file(file):
     """ Check if a single file exists. """
-    # Use `isfile()` vs. `exists()` because `exists()` can check for 
+    # Use `isfile()` vs. `exists()` because `exists()` can check for
     # directories.
     if not os.path.isfile(file):
         print(f"Warning: File '{file}' does not exist.")
@@ -53,7 +58,7 @@ def fmtout(s: str, width: int = 80, border: str = "#") -> str:
 # Given a config milestone name, return a formatted GitHub(R) URL request
 # version.
 def fmt_milestone(s):
-    return re.sub(r"(\D)(\d+)", r"\1-\2", s) 
+    return re.sub(r"(\D)(\d+)", r"\1-\2", s)
 
 # Returns dictionary of classes, with class as key and string list of methods
 # as value.
@@ -72,3 +77,107 @@ def methods_to_strlst(config):
             strlst[clazz].append(f"{ret} {name}")
 
     return strlst
+
+def get_dirs(root, reserved=None):
+    """
+    Returns a list of non-hidden directories from root. Optional reserved
+    directories to also skip.
+    """
+
+    if reserved is None:
+        reserved = []
+    reserved = [os.path.normpath(os.path.join(root, r)) for r in reserved]
+
+    dirs = []
+
+    logger.info("Building directory list...")
+    for dir in os.listdir(root):
+        if dir.startswith("."):
+            logger.info(f"Skipping dotfile: '{dir}'...")
+            continue
+
+        path = os.path.normpath(os.path.join(root, dir))
+        if path in reserved:
+            logger.info(f"Skipping reserved directory: '{dir}'...")
+            continue
+
+        logger.debug(f"Appended directory: {dir}.")
+        dirs.append(dir)
+
+    return dirs
+
+def get_files(clazzes, path=""):
+    """
+    Returns a dictionary of `.cpp` and `.hpp` files found for the provided
+    classes in the provided path.
+    """
+    files = {
+        "hpp" : {},
+        "cpp" : {},
+    }
+
+    for clazz in clazzes:
+        words = split_clazz_name(clazz)
+        args = ' '.join(words)
+
+        # Run the shell scripts to find `.hpp` and `.cpp` files.
+        for ext in ["hpp", "cpp"]:
+            if path != "":
+                # Have to backtrack a directory to be back in root from scripts.
+                cmd = f"./scripts/find-{ext}.sh {path} {args}"
+                print(f"Grader: find-{ext}.sh command: {cmd}")
+
+                stdout, stderr, code = shell.cmd(cmd)
+                print(f"Grader: _get_files: {stdout}")
+
+                if stdout.strip():  # Only add if there are results.
+                    files[ext][clazz] = \
+                        f"{path}/{stdout.strip().splitlines()[0]}"
+            else:
+                # xxx handle handle path (root path).
+                print("Grader: _get_files: Empty path.")
+
+    return files
+
+def find_header(lines, name):
+    """
+    Returns header end index, -1 if header not found on lines[0], or -2 if
+    header malformed.
+    """
+    if not lines:
+        logger.warning("empty lines")
+        return -1
+
+    # If file doesn't contain beginning comment block, it doesn't have
+    # a header.
+    COMMENT_BEGINS = ["/**", "//", "/*"]
+    if not any (s in lines[0] for s in COMMENT_BEGINS):
+        logger.warning(
+            f"lines[0] did not contain a comment starting block in "
+            f"{name}."
+        )
+        return -1
+    logger.info(f"Found header comment starting block.")
+
+    # Find the end of the comment block.
+    #end = "".join(lines).find("*/") or "".join(lines).find("\n")
+    end = next(
+        (i for i, line in enumerate(lines)
+        if line.strip() == "" or "*/" in line),
+        -2
+    )
+    # Sanity check: Header shouldn't be longer than 25 lines.
+    if end > 25:
+        end = -2
+
+    if end == -2:
+        # Malformed comment block.
+        logger.warning(
+            f"Malformed comment block in {name}."
+        )
+        return end
+
+    logger.info(f"Header comment block is not malformed.")
+    logger.info(f"Header starts on lines[0] and ends on lines[{end}].")
+
+    return end
