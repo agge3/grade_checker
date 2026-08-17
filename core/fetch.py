@@ -12,6 +12,9 @@ from dotenv import load_dotenv
 from datetime import datetime
 
 
+from github import Github
+from github import Auth
+
 class Fetcher:
     def __init__(self, milestone, config, path='', date=datetime(2025, 1, 1)):
         self._shell = Shell()

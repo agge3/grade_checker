@@ -3,6 +3,7 @@ from core.shell import Shell
 from core.build import Build
 from core.file_processor import FileProcessor
 from tools import util
+from pathlib import Path
 
 from sympy import primerange
 from dateutil import parser
@@ -93,16 +94,24 @@ class Grader:
             # Run the shell scripts to find `.hpp` and `.cpp` files.
             for ext in ["hpp", "cpp"]:
                 if self._path != "":
-                    # Have to backtrack a directory to be back in root from scripts.
+                    # Try shell script first (works on both Linux and macOS now)
                     cmd = f"./scripts/find-{ext}.sh {self._path} {args}"
                     print(f"Grader: find-{ext}.sh command: {cmd}")
 
                     stdout, stderr, code = self._shell.cmd(cmd)
                     print(f"Grader: _get_files: {stdout}")
-
+                    
                     if stdout.strip():  # Only add if there are results.
                         files[ext][clazz] = \
                             f"{self._path}/{stdout.strip().splitlines()[0]}"
+                    else:
+                        # Fallback to Python-based finder (cross-platform)
+                        print(f"Grader: Shell script returned no results. Trying Python fallback...")
+                        file_extensions = ["h", "hpp", "hh"] if ext == "hpp" else ["cpp", "cxx", "cc"]
+                        found = util.find_files(self._path, clazz, file_extensions)
+                        if found:
+                            print(f"Grader: Python finder found: {found}")
+                            files[ext][clazz] = f"{self._path}/{found[0]}"
                 else:
                     # xxx handle handle path (root path).
                     print("Grader: _get_files: Empty path.")
@@ -121,62 +130,62 @@ class Grader:
             # xxx skipping header files, because those aren't consistently
             # graded
             # Check the `.hpp` file for function declarations and method headers.
-            """
-            processor = FileProcessor(self.files["hpp"][clazz], 'r')
-            for fh, ftype in processor:
-                lines = fh.readlines()
-                #print(lines)
-                for idx, line in enumerate(lines):
-                    #print(line)
-                    for fn, visited in self._func_hpp[clazz].items():
-                        if visited:
-                            continue
-                        if fn in line:
-                            func_strlst += f"FOUND: {fn} in {fh.name}\n"
+            # """
+            # processor = FileProcessor(self.files["hpp"][clazz], 'r')
+            # for fh, ftype in processor:
+            #     lines = fh.readlines()
+            #     #print(lines)
+            #     for idx, line in enumerate(lines):
+            #         #print(line)
+            #         for fn, visited in self._func_hpp[clazz].items():
+            #             if visited:
+            #                 continue
+            #             if fn in line:
+            #                 func_strlst += f"FOUND: {fn} in {fh.name}\n"
 
-                            self._func_hpp[clazz][fn] = True
+            #                 self._func_hpp[clazz][fn] = True
 
-                            inline = lambda l: (
-                                re.search(r"//", l) or
-                                (re.search(r"/\*", l) and re.search(r"\*/", l))
-                                # xxx could capture `/* .* */`
-                            )
+            #                 inline = lambda l: (
+            #                     re.search(r"//", l) or
+            #                     (re.search(r"/\*", l) and re.search(r"\*/", l))
+            #                     # xxx could capture `/* .* */`
+            #                 )
 
-                            if ("*/" in lines[idx - 1] or "//" in lines[idx - 1] or
-                                inline(line)):
-                                self._hpp_comments[clazz][fn] = True
-                                print(
-                                    f"Grader: check_func: FOUND method header in "
-                                    f"{fh.name} for {fn}."
-                                )
-                                if inline(line):
-                                    print(
-                                        f"Grader: check_func: Method header line "
-                                        f"in {fh.name} at lines[{idx}]: "
-                                        f"{line.strip()}."
-                                    )
-                                else:
-                                    print(
-                                        f"Grader: check_func: Method header line "
-                                        f"in {fh.name} at lines[{idx - 1}: "
-                                        f"{lines[idx - 1].strip()}."
-                                    )
+            #                 if ("*/" in lines[idx - 1] or "//" in lines[idx - 1] or
+            #                     inline(line)):
+            #                     self._hpp_comments[clazz][fn] = True
+            #                     print(
+            #                         f"Grader: check_func: FOUND method header in "
+            #                         f"{fh.name} for {fn}."
+            #                     )
+            #                     if inline(line):
+            #                         print(
+            #                             f"Grader: check_func: Method header line "
+            #                             f"in {fh.name} at lines[{idx}]: "
+            #                             f"{line.strip()}."
+            #                         )
+            #                     else:
+            #                         print(
+            #                             f"Grader: check_func: Method header line "
+            #                             f"in {fh.name} at lines[{idx - 1}: "
+            #                             f"{lines[idx - 1].strip()}."
+            #                         )
 
-                for e in self._func_hpp[clazz].items():
-                    if not e[1]:
-                        func_strlst += f"MISSING {e[0]} in {fh.name}\n"
-                for e in self._hpp_comments[clazz].items():
-                    if not e[1]:
-                        print(
-                            f"Grader: check_func: MISSING method header for {e[0]} "
-                            f"in {fh.name}."
-                        )
-                    else:
-                        print(
-                            f"Grader: check_func: FOUND method header for {e[0]} "
-                            f"in {fh.name}."
-                        )
-            """
+            #     for e in self._func_hpp[clazz].items():
+            #         if not e[1]:
+            #             func_strlst += f"MISSING {e[0]} in {fh.name}\n"
+            #     for e in self._hpp_comments[clazz].items():
+            #         if not e[1]:
+            #             print(
+            #                 f"Grader: check_func: MISSING method header for {e[0]} "
+            #                 f"in {fh.name}."
+            #             )
+            #         else:
+            #             print(
+            #                 f"Grader: check_func: FOUND method header for {e[0]} "
+            #                 f"in {fh.name}."
+            #             )
+            # """
 
             try:
                 processor = FileProcessor(self.files["cpp"][clazz], 'r')
@@ -336,7 +345,7 @@ class Grader:
         return parsed_dates  # Return the list of valid dates
 
 
-    def check_headers(self, points):
+    def 	check_headers(self, points):
         # xxx return total points
 
         date_pattern = r"\d{2}/\d{2}/\d{2}"

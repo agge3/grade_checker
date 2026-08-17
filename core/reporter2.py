@@ -18,7 +18,12 @@ class Reporter2:
         load_dotenv(self._dotenv)
         self._milestone = milestone
         self._config = config
+        
         self._rep = {}
+        """
+        Dictionary that stores information for all repositories
+        """
+        
         self._shell = Shell()
         self._set_config()
         self._check_build_out = self._init_check_build_out()
@@ -719,8 +724,8 @@ class Reporter2:
     def _report(self):
         # We're going to set up our dictionary. Invalid git usernames are
         # indexed as f"XXX{idx++}".
-        idx = 0
-        incr = False
+        invalid_github_username_index = 0
+        should_increment_index = False
         for repo in self.repos:
             if repo == '/report':
                 print('Reporter2: _report: Skipped `report` directory.')
@@ -728,17 +733,17 @@ class Reporter2:
 
             print(f"Reporting {repo}...")
 
-            # Construct path.
+            # Construct path to output the report files
             path = f"{self._repo_root}{repo}"
-            print(f"Path: {path}")
+            print(f"Report File Output Path: {path}")
 
             username = self._get_git_username(repo)
             # xxx could have better control flow
             if username == "XXX":
-                username = f'XXX{idx}'
+                username = f'XXX{invalid_github_username_index}'
                 self._rep[username] = {}
-                print(f"Added to report dictionary: XXX{idx}")
-                incr = True
+                print(f"Added to report dictionary: XXX{invalid_github_username_index}")
+                should_increment_index = True
             else:
                 self._rep[username] = {}
                 print(f"Added to report dictionary: {username}")
@@ -751,7 +756,10 @@ class Reporter2:
                 r'echo $(git log -n 1 --pretty=format:"%h %an %ad %s") && ' +
                 f'cd -'
             )
+            # Get timestamp of latest commit
             stdout, stderr, code = self._shell.cmd(cmd)
+            
+						# Save timestamp to dictionary
             self._rep[username]['time'] = stdout
             print(f"git log: {stdout}")
 
@@ -869,9 +877,9 @@ class Reporter2:
 
             grader = None   # flag for GC
 
-            if incr:
-                idx += 1
-                incr = False
+            if should_increment_index:
+                invalid_github_username_index += 1
+                should_increment_index = False
 
             # xxx check build output
 
@@ -879,8 +887,8 @@ class Reporter2:
     def report(self):
         for k, v in self._rep.items():
             # xxx make sure reports exists.
-            path = f'repos/{self._milestone}/reports/{k}_report.txt'
-            out = open(path, 'w')
+            report_path = f'repos/{self._milestone}/reports/{k}_report.txt'
+            report_file_output = open(report_path, 'w')
 
             def print_list(lst, out, header, tabs=0):
                 tab = "\t" * tabs
@@ -902,25 +910,25 @@ class Reporter2:
                 if not tabs:
                     out.write("]\n\n")
 
-            out.write(util.fmtout("GitHub Username"))
-            out.write("\n\n")
-            out.write(k + '\n')
-            out.write("\n")
+            report_file_output.write(util.fmtout("GitHub Username"))
+            report_file_output.write("\n\n")
+            report_file_output.write(k + '\n')
+            report_file_output.write("\n")
 
-            out.write(util.fmtout("Timestamp"))
-            out.write("\n\n")
-            out.write(v['time'] + '\n')
+            report_file_output.write(util.fmtout("Timestamp"))
+            report_file_output.write("\n\n")
+            report_file_output.write(v['time'] + '\n')
 
             # xxx headers are backwards (`.hpp`) first. maybe design API better
             # so they're better organized.
-            out.write(util.fmtout("File Headers"))
-            out.write("\n\n")
+            report_file_output.write(util.fmtout("File Headers"))
+            report_file_output.write("\n\n")
             lines = v['headers']['output']
             for line in lines:
-                out.write(line)
+                report_file_output.write(line)
                 if '*/' in line or '' in line:
-                    out.write('\n')
-            out.write('\n') # xxx maybe not needed because of above condition
+                    report_file_output.write('\n')
+            report_file_output.write('\n') # xxx maybe not needed because of above condition
 
             # Unpack method information for output report.
             for clazz in self._config["classes"]:
@@ -931,169 +939,85 @@ class Reporter2:
                 cpp_comments = v['methods'][clazz]['cpp_comments']
                 hpp_comments = v['methods'][clazz]['hpp_comments']
 
-                out.write(util.fmtout(f'{clazz} Methods'))
-                out.write('\n\n')
+                report_file_output.write(util.fmtout(f'{clazz} Methods'))
+                report_file_output.write('\n\n')
 
                 # func_strlst has an extra newline appended to it.
-                out.write(func_strlst)
-                out.write('\n')
+                report_file_output.write(func_strlst)
+                report_file_output.write('\n')
 
-                out.write(util.fmtout(f'{clazz} `.cpp` Method Headers'))
-                out.write('\n\n')
+                report_file_output.write(util.fmtout(f'{clazz} `.cpp` Method Headers'))
+                report_file_output.write('\n\n')
                 for e in cpp_comments.items():
                     if not e[1]:
-                        out.write(
+                        report_file_output.write(
                             f"MISSING method header for {e[0]}.\n"
                         )
                     else:
-                        out.write(
+                        report_file_output.write(
                             f"FOUND method header for {e[0]}.\n"
                         )
-                out.write('\n')
+                report_file_output.write('\n')
 
                 # Is just noise because we're providing header files, so impossible
                 # condition guarded, but left it.
                 header_comments = False
                 if header_comments:
-                    out.write(util.fmtout('`.hpp` Method Headers'))
+                    report_file_output.write(util.fmtout('`.hpp` Method Headers'))
                     for e in hpp_comments.items():
                         if not e[1]:
-                            out.write(
+                            report_file_output.write(
                                 f"MISSING method header for {e[0]}.\n"
                             )
                         else:
-                            out.write(
+                            report_file_output.write(
                                 f"FOUND method header for {e[0]}.\n"
                             )
-                    out.write('\n')
+                    report_file_output.write('\n')
 
-            out.write(util.fmtout('GTest Check'))
-            out.write('\n\n')
-            out.write(f'Output: {v['extra_credit']['output']}.\n')
-            out.write('\n')
+            report_file_output.write(util.fmtout('GTest Check'))
+            report_file_output.write('\n\n')
+            report_file_output.write(f'Output: {v['extra_credit']['output']}.\n')
+            report_file_output.write('\n')
 
-            out.write(util.fmtout('Output Check'))
-            out.write('\n\n')
+            report_file_output.write(util.fmtout('Output Check'))
+            report_file_output.write('\n\n')
 
             # NOTE: will be None if config set, so guard
             if not self._config["options"]["check_build"]:
-                out.write("NO OUTPUT CHECK\n\n")
+                report_file_output.write("NO OUTPUT CHECK\n\n")
             else:
                 no_match = v['build']['no_match']
                 manifest = v['build']['manifest']
 
-                out.write(f'Output:\n')
-                print_list(no_match, out, 'MISSING')
+                report_file_output.write(f'Output:\n')
+                print_list(no_match, report_file_output, 'MISSING')
 
-                out.write(f'Manifest:\n')
-                print_list(manifest, out, 'FOUND')
+                report_file_output.write(f'Manifest:\n')
+                print_list(manifest, report_file_output, 'FOUND')
 
-            out.write(util.fmtout('Build Output'))
-            out.write('\n\n')
+            report_file_output.write(util.fmtout('Build Output'))
+            report_file_output.write('\n\n')
 
             if not self._config["options"]["build"]:
-                out.write("NO BUILD\n\n")
+                report_file_output.write("NO BUILD\n\n")
             else:
                 postfmt = v['build']['postfmt']
                 for line in postfmt:
-                    out.write(line + '\n')
-                out.write('\n')
+                    report_file_output.write(line + '\n')
+                report_file_output.write('\n')
 
             if not self._config["options"]["build"]:
-                out.write("NO BUILD\n\n")
+                report_file_output.write("NO BUILD\n\n")
             else:
-                out.write(util.fmtout('Raw Build Output'))
-                out.write('\n\n')
+                report_file_output.write(util.fmtout('Raw Build Output'))
+                report_file_output.write('\n\n')
                 prefmt = v['build']['prefmt']
-                out.write(prefmt)
+                report_file_output.write(prefmt)
+                
 
-    # xxx deprecated
-    def depr_report(self):
-            # pwd and regex capture project root
-            self.report["name"] = self._grader.get_name()
-            self.report["points"]["total"] = self._config["grading"]["total"]
+            # Flush file content to File System
+            report_file_output.close()    
 
-            if self._config["options"]["build"]:
-                build = Build()
-                out, res = build.make_run()
+						
 
-                if not res:
-                    self.report["build"] = {
-                        "result" : "Build unsuccessful.",
-                        "score" : 0,
-                        "output" : out
-                    }
-                else:
-                    self.report["build"] = {
-                        "result" : "Build successful.",
-                        "score" : self._config["grading"]["build"],
-                        "output" : out
-                    }
-
-            if self._config["extra_credit"]["enabled"]:
-                pts, out = self._grader.check_ec(self._config["extra_credit"]["args"])
-                self.report["score"] = {
-                    "score" : self._config["grading"]["extra_credit"],
-                    "output" :  out
-                }
-
-            pts, out = self._grader.check_headers(self._config["grading"]["headers"])
-            self.report["headers"] = {
-                "score" : pts,
-                "output" : out
-            }
-
-            # Comments for File, Class and Method headers.
-            # Implementations for all of the required methods.
-            pts, out = self._grader.check_func(self._config["grading"]["methods"])
-            self.report["methods"] = {
-                "score" : pts,
-                "output" : out
-            }
-
-            #
-            # Checks for extra items that can easily be grepped for via an argument
-            # list. Including:
-            #   1. Hard coded values (i.e., sizes of Hashtable, arrays, or cache,
-            #      etc.)
-            #
-            for k, v in self._config["extra"].items():
-                if v["enabled"]:
-                    pts, out = self._grader.check_for(v["args"],
-                                                self._config["grading"][v])
-                    self.report[k] = {
-                        "score" : pts,
-                        "output" : out
-                    }
-
-            # Static variables or methods.
-            pts, out = self._grader.check_static(self._config["grading"]["static"])
-            self.report["static"] = {
-                "score" : pts,
-                "output" : out
-            }
-
-            # Use of STL before Milestone 4 (the implementations of the Data
-            # Structures should be hand-written, not use STL).
-            if self._config["options"]["stl"]:
-                pts, out = self._grader.check_stl(self._config["grading"]["stl"])
-                self.report["stl"] = {
-                    "score" : pts,
-                    "output" : out
-                }
-
-            # Methods without any parameters (with the exception of getters/main).
-            # xxx might be harder, but probably a grep regex pattern:
-
-            # Lack of header files (all code in one file).
-            pts, out = self._grader.check_hpp(self._config["grading"]["hpp"])
-            self.report["hpp"] = {
-                "score" : pts,
-                "output" : out
-            }
-
-            actual = 0
-            for k, v in self.report.items():
-                if isinstance(v, dict):
-                    actual += k.get("score", 0)
-            self.report["points"]["actual"] = actual
