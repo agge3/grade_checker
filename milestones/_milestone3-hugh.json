@@ -1,9 +1,10 @@
 {
 	"milestone": "milestone3",
 	"prof": "hugh",
-	"org": "SFSU-CSC-340-3",
+	"org": "SFSU-CSC340-00",
 	"clone": true,
 	"glob": "cache-manager",
+	"usernames_file": "usernames.txt",
 	"classes": ["DoublyLinkedList", "HashTable", "CacheManager"],
 	"methods": {
 		"DoublyLinkedList": {

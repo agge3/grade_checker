@@ -1,8 +1,9 @@
 {
 	"milestone": "milestone5",
 	"prof": "hugh",
-	"org": "SFSU-CSC-340-3",
+	"org": "SFSU-CSC340-00",
 	"clone": true,
+	"usernames_file": "usernames.txt",
 	"glob": "cachemanager-bst",
 	"classes": ["DoublyLinkedList", "HashTable", "CacheManager", "BinarySearchTree" ],
 	"methods": {

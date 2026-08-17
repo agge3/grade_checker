@@ -1,9 +1,10 @@
 {
 	"milestone": "milestone4",
 	"prof": "hugh",
-	"org": "SFSU-CSC-340-3",
+	"org": "SFSU-CSC340-00",
 	"clone": true,
 	"glob": "binary-search-tree",
+	"usernames_file": "usernames.txt",
 	"classes": ["BinarySearchTree"],
 	"methods": {
 		"BinarySearchTree": {
