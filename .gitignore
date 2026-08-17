@@ -18,3 +18,5 @@ png
 tmp
 **/*.DS_Store
 old
+
+.logs/**
