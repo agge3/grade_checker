@@ -27,10 +27,10 @@ cpp_headers = False
 
 
 class Grader:
-    def __init__(self, milestone, config, path=""):
-        self._shell = Shell()
+    def __init__(self, shell, milestone, config, path=""):
+        self._shell = shell
         self._milestone = milestone
-        self._config = config
+        self._config = config._config
         self._path = path
 
         # merge_config and instantiated Grader config
