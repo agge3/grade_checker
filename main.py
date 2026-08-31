@@ -83,7 +83,7 @@ def main():
         grader = Grader(shell, milestone, config)
 
         name = ""   # pwd and regex capture project root
-        score = config._config["grading"]["total"]
+        score = config._config["grading"]["points"]
         
         if config._config["options"]["build"]:
             build = Build()
