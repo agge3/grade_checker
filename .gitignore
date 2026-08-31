@@ -1,4 +1,6 @@
 .venv
+pyvenv.cfg
+lib/*
 __pycache__
 hidden
 core/__pycache__
