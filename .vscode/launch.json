@@ -20,8 +20,8 @@
 			"request": "launch",
 			"program": "main.py",
 			"console": "integratedTerminal",
-			"env": {"prof": "hugh", "num": "3"},
-			"args": ["milestone3-hugh", "-f"]
+			"env": {"prof": "hugh", "num": "1"},
+			"args": ["milestone3-hugh", "-g"]
 		},
 		{
 			"name": "Python Debugger: Current File with Arguments for new Grader",

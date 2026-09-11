@@ -4,8 +4,9 @@
 # argument). Matching lines are printed to stdout, separated as lines.
 
 fh="$1"
+# BUG: The loop below uses `$file`, but the input variable is named `$fh`.
 shift
 for search in "$@"
 do
-	grep "$search" "$file"
+    grep "$search" "$file"
 done

@@ -20,6 +20,8 @@ import re
 
 # Grade HashTable.
 def grade_hash_table():
+    # BUG: This legacy helper is never called and uses obsolete Build/Grader
+    # constructor signatures and obsolete check-method signatures.
     shell = Shell()
     build = Build()
 
@@ -84,34 +86,41 @@ def main():
 
         name = ""   # pwd and regex capture project root
         score = config._config["grading"]["points"]
+        # BUG: The score is initialized but never updated, displayed, returned,
+        # or written to a report in this code path.
         
         if config._config["options"]["build"]:
-            build = Build()
+            build = Build(milestone, config._config)
             out, res = build.make_run()
             
             if not res:
-                score -= config._config["grading"]["build"]
+                # score -= config._config["grading"]["build"]
                 print("Build unsuccessful. Report:")
                 print(out)
+
+        # BUG: All substantive grading checks below are commented out, so
+        # --grade currently performs a build only.
             else:
                 print("Build successful. Report:")
                 print(out)
 
-        if config._config["extra_credit"]["enabled"]:
-            pts, out = grader.check_ec(config._config["extra_credit"]["args"])
-            score += config._config["grading"]["extra_credit"]
-            print(out)
+        # if config._config["extra_credit"]["enabled"]:
+            # pts, out = grader.check_ec(config._config["extra_credit"]["args"])
+            # score += config._config["grading"]["extra_credit"]
+            # print(out)
 
 
-        pts, out = grader.check_headers(config._config["grading"]["headers"])
-        score -= pts
-        print(out)
+        # pts, out = grader.check_headers(config._config["grading"]["headers"])
+        # score -= pts
+        # print(out)
 
-        pts, out = grader.check_func(config._config["grading"]["methods"])
-        score -= pts
-        print(out)
+        # pts, out = grader.check_func(config._config["grading"]["methods"])
+        # score -= pts
+        # print(out)
 
     if args.report:
+        # BUG: Reporter2 currently calls Build and Grader with signatures that
+        # do not match their active class definitions, so reporting cannot run.
         print("main: Entered Reporter.")
         reporter = Reporter2(milestone, config._config)
         reporter._report()

@@ -8,6 +8,8 @@ stl=("using namespace std", "std::vector", "std::list")
 cpp=$(./find_cpp.sh)
 hpp=$(./find_hpp.sh)
 fhs=() # xxx join those arrays
+# BUG: fhs is never populated, so no source files are checked. The array above
+# also uses commas, making the intended search terms malformed.
 
 for fh in "${fhs[@]}"
 do

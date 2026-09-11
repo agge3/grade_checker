@@ -78,6 +78,8 @@ def merge(milestone):
 
     # Construct the full path for the milestone.
     print(milestone)
+    # BUG: This path is relative to the process working directory, so invoking
+    # the program from outside the repository cannot find the configuration.
     path = f"milestones/_{milestone}.json"
     print(path)
 

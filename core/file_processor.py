@@ -36,6 +36,8 @@ class FileProcessor:
                     flat_files.append(item)
                 elif isinstance(item, list):  # If item is a nested list, flatten it
                     flat_files.extend(self._normalize_files(item))
+                # BUG: Unsupported entries, including dictionaries used by
+                # Grader.files, are silently ignored instead of rejected.
             return flat_files
         else:
             raise ValueError("Files should be a string, list of strings, or nested list of strings.")
@@ -83,6 +85,9 @@ class FileProcessor:
         try:
             # For `UnicodeDecodeError: 'utf-8' codec can't decode byte 0x95`.
             # Find encoding first. XXX This is very expensive!
+            # BUG: The binary probe file is opened without a context manager,
+            # leaking a file descriptor. chardet may also return None for the
+            # encoding, which makes the following open call fail.
             encoding = chardet.detect(open(file_path, 'rb').read())['encoding']
 
             # Then open the file with the client's op mode and a known encoding.
@@ -108,4 +113,3 @@ class FileProcessor:
 
         _, ext = os.path.splitext(self._curr)
         return ext  # Returns the file extension (e.g., '.hpp', '.cpp', etc.)
-

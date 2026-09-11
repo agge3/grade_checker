@@ -9,19 +9,24 @@ import re
 
 
 class Build:
-    def __init__(self, milestone, config, repo_path):
+    def __init__(self, milestone, config):
         self._shell = Shell()
         self._config = config
 
         self._milestone = milestone
         print(f'Build:\tmilestone:\t{self._milestone}')
 
-        self._pmilestone = self._milestone + f'-{self._config['prof']}'
-        print(f'Build:\tprofessor milestone:\t{self._pmilestone}')
+        # Milestone with Professor's name appended.
+        self._pmilestone = self._milestone + f"-{self._config['prof']}"
+        print(f"Fetcher:\tprofessor milestone:\t{self._pmilestone}")
+
+        # Format "milestoneX" as "milestone-X".
+        self._fmilestone = util.fmt_milestone(milestone)
+        print(f"Fetcher:\tformatted milestone:\t{self._fmilestone}")
 
         # Relative.
         # xxx
-        self._repo_path = repo_path
+        self._repo_path = f"repos/{self._pmilestone}"
         self._fhs = self._init_fhs()
 
         self._missing = []
@@ -142,6 +147,9 @@ class Build:
         print(f"Build: repo_path: {self._repo_path}")
         exec = self._find_exec()
 
+        # BUG: This uses interpolated values inside a destructive shell command;
+        # malformed or untrusted paths can alter the command. stderr is also
+        # discarded from the returned build report.
         stdout, stderr, code = self._shell.cmd(
 	        f"rm -rf {self._repo_path}/build && " +
 	        f"mkdir -p {self._repo_path}/build && " +

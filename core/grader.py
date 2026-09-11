@@ -16,6 +16,8 @@ class Logger:
         self.filename = filename
 
     def log(self, level, message):
+        # BUG: datetime is not imported, so using this logger raises
+        # NameError. The global logger is currently unused.
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_message = f"[{timestamp}] [{level}] {message}\n"
         with open(self.filename, "a") as f:
@@ -27,11 +29,23 @@ cpp_headers = False
 
 
 class Grader:
-    def __init__(self, shell, milestone, config, path=""):
+    def __init__(self, shell, milestone, config):
         self._shell = shell
         self._milestone = milestone
         self._config = config._config
-        self._path = path
+
+        self._milestone = milestone
+        print(f"Fetcher:\tmilestone:\t{self._milestone}")
+
+        # Milestone with Professor's name appended.
+        self._pmilestone = self._milestone + f"-{self._config['prof']}"
+        print(f"Fetcher:\tprofessor milestone:\t{self._pmilestone}")
+
+        # Format "milestoneX" as "milestone-X".
+        self._fmilestone = util.fmt_milestone(milestone)
+        print(f"Fetcher:\tformatted milestone:\t{self._fmilestone}")
+
+        self._path = self._fmilestone
 
         # merge_config and instantiated Grader config
         self._func_hpp = {}
@@ -121,6 +135,8 @@ class Grader:
 
     """Check for the presence of functions in the class header and definition files."""
     def check_func(self, points):
+        # BUG: points is accepted but never used; this method reports detected
+        # functions rather than calculating a grade.
         func_strlst_dict = {}
         pts_dict = {}
 
@@ -208,6 +224,8 @@ class Grader:
                                     # xxx could capture `/* .* */`
                                 )
 
+                                # BUG: idx == 0 reads lines[-1], treating the
+                                # final line as the preceding comment line.
                                 if ("*/" in lines[idx - 1] or "//" in lines[idx - 1] or
                                     inline(line)):
                                     self._cpp_comments[clazz][fn] = True
@@ -291,11 +309,15 @@ class Grader:
     # xxx completely broken by _func_(hpp|cpp|comments) ->
     # _func_(hpp|cpp|comments)[clazz] change
     def get_func_comments(self):
+        # BUG: _func_comments was removed in favor of _hpp_comments and
+        # _cpp_comments, so this method raises AttributeError if called.
         return self._func_comments
 
     # xxx completely broken by _func_(hpp|cpp|comments) ->
     # _func_(hpp|cpp|comments)[clazz] change
     def score_func(self):
+        # BUG: This legacy method references removed state (_func_comments and
+        # self.clazz) and is incompatible with the current nested structures.
         func_hpp, func_cpp, func_comments = (
             self._func_hpp, self._func_cpp, self._func_comments
         )
@@ -382,6 +404,8 @@ class Grader:
 
                     # If file doesn't contain beginning comment block, it doesn't have
                     # a header.
+                    # BUG: This expression only tests "/**"; Python evaluates
+                    # ("/**" or "//" or "/*") to the first non-empty string.
                     if ("/**" or "//" or "/*") not in lines[0]:
                         headers[ftype] = False
                         print(
@@ -404,6 +428,8 @@ class Grader:
                         -1
                     )
                     # Sanity check: Header shouldn't be longer than 25 lines.
+                    # BUG: The expression below has no effect. It likely meant
+                    # to assign end = -1 when the header is too long.
                     if end > 25:
                         end -1
 
@@ -460,11 +486,16 @@ class Grader:
                 if not v:
                     header_missing = header_missing + 1
 
+        # BUG: This returns the missing-header ratio as a score, so more
+        # missing headers produces a larger score. It also ignores `points`.
         score = 1 * (header_missing / header_cnt)
 
         return score, cap_headers
 
     def check_list(self):
+        # BUG: self.files contains dictionaries, but FileProcessor silently
+        # drops dictionaries during normalization. This can produce a false
+        # result without checking any source files.
         pts = 1
 
         found_lst = True
@@ -494,6 +525,8 @@ class Grader:
         return pts if found_lst else 0
 
     def check_for(self, lst, total_points = 1, deduction = 1):
+        # BUG: lst_to_str is not imported/defined, self.shell should be
+        # self._shell, and Shell.cmd returns a tuple rather than a string.
         out = []
         s = lst_to_str(lst)
 
@@ -514,6 +547,9 @@ class Grader:
         return total_points, out
 
     def check_prime(self):
+        # BUG: self.files["hpp"] is a dictionary and is discarded by
+        # FileProcessor; additionally, substring matching causes false hits
+        # (for example, prime "13" matches "113").
         pts = 1
 
         limit = 10000
@@ -529,6 +565,9 @@ class Grader:
         return 0
 
     def check_ec(self, args, points):
+        # BUG: The loop repeats the same repository-wide script once per file;
+        # the file handle is never passed to the script. The relative script
+        # path is also wrong when called from the project root.
         ec_args = ' '.join(args)  # Join the list into a single string.
         out = []
 
@@ -549,4 +588,3 @@ class Grader:
 
     def store_impl(self):
         return 0
-

@@ -85,6 +85,8 @@ class Fetcher:
             return []
     def fetch(self):
         if self._config['fetch']['clear']:
+            # BUG: This destructive command interpolates the configured path
+            # without validation or safe argument handling.
             stdout, stderr, code = self._shell.cmd(
                     f"rm -rf {self._path} && " +
                     f"mkdir {self._path}"
@@ -168,6 +170,8 @@ class Fetcher:
         pushed_at = datetime.strptime(repo['pushed_at'],
                                       "%Y-%m-%dT%H:%M:%SZ")
 
+        # BUG: Checking year and month with `and` is not a correct complete-date
+        # comparison for determining whether a repository is too old.
         if (created_at.year < self._mindate.year and
             created_at.month < self._mindate.month):
             return

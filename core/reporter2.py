@@ -64,6 +64,8 @@ class Reporter2:
         # xxx could also be set up ahead of time by fetch.
         self.repos = []
         print("Reporter: _set_config: Building repository list...")
+        # BUG: Missing repository roots raise FileNotFoundError instead of
+        # producing an empty report or a useful validation error.
         for dir in os.listdir(self._repo_root):
             if dir.startswith("."):
                 print(f"{self._name}: INFO: skipping dotfile: '{dir}'...")
@@ -727,6 +729,8 @@ class Reporter2:
         invalid_github_username_index = 0
         should_increment_index = False
         for repo in self.repos:
+            # BUG: os.listdir returns "report", not "/report", so this does
+            # not actually skip the report directory.
             if repo == '/report':
                 print('Reporter2: _report: Skipped `report` directory.')
                 continue
@@ -768,6 +772,9 @@ class Reporter2:
             if not self._config["options"]["copy"]:
                 print(f"{self._name}: copy option is not set: skipping...")
             else:
+                # BUG: Build.__init__ accepts only (milestone, config), so this
+                # call raises TypeError. The per-repository path is unsupported
+                # by the current Build implementation.
                 build = Build(self._milestone, self._config, path)
 
                 print(f"{self._name}: copy option is set: copying...")
@@ -823,6 +830,8 @@ class Reporter2:
 
             build = None    # flag for GC (if created)
 
+            # BUG: Grader expects (shell, milestone, config); these arguments
+            # are in the wrong order and the path argument is unsupported.
             grader = Grader(self._milestone, self._config, path)
 
             if self._config["extra_credit"]["enabled"]:
@@ -832,7 +841,7 @@ class Reporter2:
                 )
                 pts, out = grader.check_ec(
                     self._config["extra_credit"]["args"],
-                    0   # xxx actually set up config for total points
+                    0   # BUG: Passing zero makes all extra-credit points zero.
                 )
 
                 self._rep[username]['extra_credit'] = {}
@@ -887,6 +896,9 @@ class Reporter2:
     def report(self):
         for k, v in self._rep.items():
             # xxx make sure reports exists.
+            # BUG: Reports are written under repos/{milestone}, while inputs
+            # are discovered under repos/{milestone}-{prof}; the output
+            # directory is also not created here.
             report_path = f'repos/{self._milestone}/reports/{k}_report.txt'
             report_file_output = open(report_path, 'w')
 
@@ -977,6 +989,8 @@ class Reporter2:
 
             report_file_output.write(util.fmtout('GTest Check'))
             report_file_output.write('\n\n')
+            # BUG: This assumes extra_credit data exists even when extra credit
+            # is disabled, and can raise KeyError.
             report_file_output.write(f'Output: {v['extra_credit']['output']}.\n')
             report_file_output.write('\n')
 
@@ -987,6 +1001,8 @@ class Reporter2:
             if not self._config["options"]["check_build"]:
                 report_file_output.write("NO OUTPUT CHECK\n\n")
             else:
+                # BUG: When building is disabled, `_report()` does not create
+                # `v['build']`; enabling output checking then raises KeyError.
                 no_match = v['build']['no_match']
                 manifest = v['build']['manifest']
 
@@ -1020,4 +1036,3 @@ class Reporter2:
             report_file_output.close()    
 
 						
-

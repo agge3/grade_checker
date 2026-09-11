@@ -12,6 +12,8 @@ import argparse
 import re
 
 def main():
+    # BUG: This is an obsolete alternate entry point. Several options are
+    # commented out below but their attributes are still referenced later.
     parser = argparse.ArgumentParser(
             prog = "V's Grade Checker"
     )
@@ -29,6 +31,8 @@ def main():
     args = parser.parse_args()
     
     # EXPECTS: _milestoneX-hugh.json
+    # BUG: args.milestone may be None because -m is optional, which makes this
+    # regular-expression call raise before the command can be handled.
     reg = re.search(r"^(\w+)-.*$", args.milestone)
     milestone = reg[1]  # expected output: milestoneX
 
@@ -39,6 +43,8 @@ def main():
       fetcher.fetch()
         #  Auth.Token()
 
+    # BUG: args.fetch/grade/report do not exist because those argparse options
+    # are commented out above.
     if args.fetch:
         fetcher = Fetcher(milestone, config._config)
         fetcher.fetch()

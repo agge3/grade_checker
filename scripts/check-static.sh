@@ -8,6 +8,8 @@ static=("static")
 cpp=$(./find_cpp.sh)
 hpp=$(./find_hpp.sh)
 fhs=() # xxx join those arrays
+# BUG: fhs is never populated, and the loop below uses undefined `stl` rather
+# than the `static` array, so this check always exits successfully.
 
 for fh in "${fhs[@]}"
 do

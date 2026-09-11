@@ -9,6 +9,9 @@ new_entries = [
 ]
 
 def main(path):
+    # BUG: This prototype ignores `path`, writes to a fixed filename, uses the
+    # undefined names `new_data` and `output_path`, and starts with an empty
+    # DataFrame instead of loading the input workbook.
     writer = pd.ExcelWriter('file.xlsx', engine='openpyxl')
     df = pd.DataFrame()
     df.to_excel(writer, sheet_name='empty')
