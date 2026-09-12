@@ -22,6 +22,8 @@ main.py
   |
   +-- core.submission_importer -- preserves student-canvas-submissions and normalizes
                                    submissions into isolated workspaces
+  +-- core.teacher_importer ---- preserves the teacher ZIP and extracts the
+                                  selected template and grading references
   |
   +-- core.build.Build --------- copies support files, configures CMake,
   |                              builds, and runs each submission
@@ -53,6 +55,13 @@ The `import-student-canvas-submissions` command requires an initialized
 workspace, then uses `SubmissionImporter` to place the raw
 student-canvas-submissions under `raw/` and
 normalized submissions under `submissions/`.
+
+The `import-teacher-zip` command requires an initialized workspace and the
+exact member name of the nested student-template ZIP. `TeacherImporter` copies
+the outer archive to `raw/`, extracts non-template artifacts under
+`references/teacher/`, extracts the template under `references/template/`, and
+records provenance in `references/teacher_metadata.json`. Unsafe archive paths
+are rejected and `.grader-ignore` template files are skipped.
 
 `load_config()` validates the JSON and returns a `Config` object. `Config`
 implements the mapping interface, so existing consumers can use expressions

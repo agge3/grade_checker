@@ -19,6 +19,7 @@ from typing import Sequence
 
 from core.workspace import Workspace, create_workspace as initialize_workspace
 from core.submission_importer import ImportResult, SubmissionImporter
+from core.teacher_importer import TeacherImportResult, TeacherImporter
 
 # Grade HashTable.
 def grade_hash_table():
@@ -392,6 +393,52 @@ def import_submissions(arguments: Sequence[str]) -> int:
     return 0
 
 
+def _import_teacher_parser() -> argparse.ArgumentParser:
+    """Build the parser for importing teacher materials.
+
+    :return: Parser describing teacher-archive import options.
+    """
+    parser = argparse.ArgumentParser(
+        prog="Grade Checker import-teacher-zip",
+        description="Import a teacher ZIP and its student template into a workspace.",
+    )
+    parser.add_argument("--workspace", required=True, help="Initialized grading workspace directory")
+    parser.add_argument("--teacher-zip", required=True, help="Teacher ZIP archive")
+    parser.add_argument(
+        "--template-zip",
+        required=True,
+        help="Exact path of the student-template ZIP inside the teacher archive",
+    )
+    return parser
+
+
+def _print_teacher_import_result(result: TeacherImportResult) -> None:
+    """Print a human-readable summary of imported teacher materials.
+
+    :param result: Teacher import result to summarize.
+    """
+    print(f"Imported teacher archive: {result.raw_archive}")
+    print(f"Template ZIP: {result.template_member}")
+    print(f"Template files copied: {len(result.template_files)}")
+    print(f"Reference files copied: {len(result.reference_files)}")
+
+
+def import_teacher_zip(arguments: Sequence[str]) -> int:
+    """Import teacher-only artifacts into an initialized grading workspace.
+
+    :param arguments: Arguments following ``import-teacher-zip``.
+    :return: Zero after a successful import.
+    :raises FileNotFoundError: If the archive or workspace is absent.
+    :raises ValueError: If either archive is invalid or unsafe.
+    """
+    args = _import_teacher_parser().parse_args(list(arguments))
+    result = TeacherImporter(
+        args.teacher_zip, args.workspace, args.template_zip
+    ).import_teacher_archive()
+    _print_teacher_import_result(result)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the grading CLI while preserving the legacy milestone commands.
 
@@ -405,6 +452,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "import-student-canvas-submissions", "import-submissions"
     }:
         return import_submissions(command_arguments[1:])
+    if command_arguments and command_arguments[0] in {
+        "import-teacher-zip", "import-teacher"
+    }:
+        return import_teacher_zip(command_arguments[1:])
 
     parser = argparse.ArgumentParser(
             prog = "Grade Checker"

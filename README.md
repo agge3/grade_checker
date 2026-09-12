@@ -106,6 +106,23 @@ submission workspace. The required file and allowed optional files are copied
 there; other files are retained in the source metadata and reported as
 warnings.
 
+### Import teacher materials
+
+Import the teacher ZIP after creating a workspace. The template option is the
+exact member path of the student-template ZIP inside the teacher archive:
+
+```bash
+python3 main.py import-teacher-zip \
+  --workspace grading-workspaces/milestone2 \
+  --teacher-zip teacher-materials.zip \
+  --template-zip student-template.zip
+```
+
+The command preserves the teacher archive under `raw/`, extracts all other
+teacher files under `references/teacher/`, extracts the selected template under
+`references/template/`, and writes `references/teacher_metadata.json`. Template
+files ending in `.grader-ignore` are excluded.
+
 ### To run all tests:
 ```bash
 python -m tests.<type_of_test>.run  # General
