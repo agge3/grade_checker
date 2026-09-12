@@ -329,61 +329,66 @@ def _existing_submissions(workspace: str | Path) -> list[str]:
     )
 
 
-def _select_submission_interactively(workspace: str | Path) -> str | None:
-    """Choose all submissions or one submission for an interactive report.
+def _select_submission_interactively(workspace: str | Path) -> list[str] | None:
+    """Choose all submissions or several submissions for an interactive report.
 
     :param workspace: Initialized grading workspace containing submissions.
-    :return: Selected identifier, or ``None`` to report all submissions.
+    :return: Selected identifiers, or ``None`` to report all submissions.
     :raises ValueError: If the selection is cancelled or invalid.
     """
     submissions = _existing_submissions(workspace)
     if not submissions:
         return None
-    all_label = "All submissions"
-    choices = [all_label, *submissions]
     if not sys.stdin.isatty() or not sys.stdout.isatty():
-        print("Report which submissions? (default: all)")
-        for index, choice in enumerate(choices, start=1):
-            print(f"  {index}. {choice}")
-        selection = input("Submission number [1]: ").strip() or "1"
-        try:
-            selected_index = int(selection) - 1
-        except ValueError as error:
-            raise ValueError("Submission selection must be a number.") from error
-        if selected_index < 0 or selected_index >= len(choices):
-            raise ValueError("Submission selection is out of range.")
-        selected = choices[selected_index]
+        selection = input("Grade all submissions? [Y/n]: ").strip().lower()
+        if not selection or selection in {"y", "yes"}:
+            return None
+        return _select_submission_numbers(submissions)
     else:
         try:
             import questionary
         except ImportError:
-            return _select_submission_interactively_fallback(choices)
-        selected = questionary.select(
-            "Report which submissions?", choices=choices, default=all_label
+            selection = input("Grade all submissions? [Y/n]: ").strip().lower()
+            if not selection or selection in {"y", "yes"}:
+                return None
+            return _select_submission_numbers(submissions)
+        grade_all = questionary.confirm(
+            "Grade all submissions?", default=True
+        ).ask()
+        if grade_all is None:
+            raise ValueError("Submission selection was cancelled.")
+        if grade_all:
+            return None
+        selected = questionary.checkbox(
+            "Select submissions to grade:", choices=submissions
         ).ask()
         if selected is None:
             raise ValueError("Submission selection was cancelled.")
-    return None if selected == all_label else selected
+        if not selected:
+            raise ValueError("Select at least one submission.")
+        return selected
 
 
-def _select_submission_interactively_fallback(choices: list[str]) -> str | None:
-    """Select a submission using a numbered prompt when no UI helper exists.
+def _select_submission_numbers(submissions: list[str]) -> list[str]:
+    """Select one or more submissions using comma-separated list numbers.
 
-    :param choices: Choices with ``All submissions`` as the first item.
-    :return: Selected identifier, or ``None`` for all submissions.
+    :param submissions: Available normalized submission identifiers.
+    :return: Selected submission identifiers.
     :raises ValueError: If the selection is invalid.
     """
-    print("Report which submissions?")
-    for index, choice in enumerate(choices, start=1):
-        print(f"  {index}. {choice}")
-    selection = input("Submission number [1]: ").strip() or "1"
+    print("Select submissions (comma-separated numbers):")
+    for index, submission in enumerate(submissions, start=1):
+        print(f"  {index}. {submission}")
+    selection = input("Submission numbers: ").strip()
+    if not selection:
+        raise ValueError("Select at least one submission.")
     try:
-        selected_index = int(selection) - 1
+        selected_indices = [int(value.strip()) - 1 for value in selection.split(",")]
     except ValueError as error:
-        raise ValueError("Submission selection must be a number.") from error
-    if selected_index < 0 or selected_index >= len(choices):
+        raise ValueError("Submission selections must be numbers separated by commas.") from error
+    if any(index < 0 or index >= len(submissions) for index in selected_indices):
         raise ValueError("Submission selection is out of range.")
-    return None if selected_index == 0 else choices[selected_index]
+    return list(dict.fromkeys(submissions[index] for index in selected_indices))
 
 
 def import_submissions(arguments: Sequence[str]) -> int:
@@ -614,7 +619,8 @@ def _report_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--submission",
-        help="Report one normalized submission identifier instead of all submissions",
+        action="append",
+        help="Report one or more normalized submission identifiers; repeat the option",
     )
     return parser
 

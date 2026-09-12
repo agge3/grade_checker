@@ -74,8 +74,8 @@ argument it offers initialized workspaces through a keyboard-navigable
 selection prompt. `WorkspaceReporter` prepares each submission's build
 workspace at report time, overlays student files on the teacher template, and
 writes per-submission reports plus a workspace summary under `reports/`. The
-report command can process all submissions or one normalized submission
-identifier. Each
+report command can process all submissions or one or more normalized submission
+identifiers. Each
 submission report retains the legacy report sections (file headers, configured
 methods, GTest/extra-credit status, and output-check status) while linking to
 the separate build and runtime logs. It clearly marks checks that are not executed by the

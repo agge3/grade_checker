@@ -155,9 +155,11 @@ python3 main.py report \
   --submission student01
 ```
 
+Repeat `--submission` to report a selected group of submissions.
+
 When `report` is run without `--workspace`, the interactive workflow asks
-whether to report all submissions or choose one from the workspace. Reporting
-all submissions is the default.
+whether to report all submissions or select one or more from the workspace.
+Reporting all submissions is the default.
 
 Each submission report directory includes a guided `notes.md` for TA-written
 observations. The generated `report.txt` contains automated findings and

@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+from collections.abc import Sequence
 from typing import Callable, Mapping, TypedDict
 
 
@@ -44,11 +45,13 @@ class WorkspaceReporter:
         self.runtime_timeout = runtime_timeout
         self.rule_configuration = "workspace metadata"
 
-    def report(self, submission: str | None = None) -> WorkspaceReportResult:
+    def report(
+        self, submission: str | Sequence[str] | None = None
+    ) -> WorkspaceReportResult:
         """Prepare, build, run, and report every normalized submission.
 
-        :param submission: Optional normalized submission identifier. When
-            provided, only that submission is reported.
+        :param submission: Optional normalized submission identifier or
+            identifiers. When provided, only those submissions are reported.
         :return: Paths to per-submission reports, the summary, and similarity
             report.
         :raises FileNotFoundError: If the workspace is not initialized.
@@ -74,26 +77,34 @@ class WorkspaceReporter:
         run_time = datetime.now(timezone.utc).isoformat()
         reports: list[Path] = []
         submissions_root = self.workspace / "submissions"
-        if submission is not None and not submissions_root.is_dir():
+        selected_submissions = (
+            [submission] if isinstance(submission, str) else list(submission or [])
+        )
+        if selected_submissions and not submissions_root.is_dir():
             raise ValueError(
-                f"Unknown submission '{submission}': the workspace has no submissions."
+                "Unknown submission selection: the workspace has no submissions."
             )
         if submissions_root.is_dir():
             available_submission_roots = sorted(
                 path for path in submissions_root.iterdir() if path.is_dir()
             )
-            if submission is None:
+            if not selected_submissions:
                 submission_roots = available_submission_roots
             else:
-                submission_root = submissions_root / submission
-                if submission_root not in available_submission_roots:
+                unavailable = [
+                    name for name in selected_submissions
+                    if submissions_root / name not in available_submission_roots
+                ]
+                if unavailable:
                     available = ", ".join(
                         path.name for path in available_submission_roots
                     ) or "none"
                     raise ValueError(
-                        f"Unknown submission '{submission}'. Available submissions: {available}."
+                        f"Unknown submission(s) {unavailable}. Available submissions: {available}."
                     )
-                submission_roots = [submission_root]
+                submission_roots = [
+                    submissions_root / name for name in selected_submissions
+                ]
             total = len(submission_roots)
             for index, submission_root in enumerate(submission_roots, start=1):
                 metadata_path = submission_root / "submission_metadata.json"
