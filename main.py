@@ -402,12 +402,11 @@ def _import_teacher_parser() -> argparse.ArgumentParser:
         prog="Grade Checker import-teacher-zip",
         description="Import a teacher ZIP and its student template into a workspace.",
     )
-    parser.add_argument("--workspace", required=True, help="Initialized grading workspace directory")
-    parser.add_argument("--teacher-zip", required=True, help="Teacher ZIP archive")
+    parser.add_argument("--workspace", help="Initialized grading workspace directory")
+    parser.add_argument("--teacher-zip", help="Teacher ZIP archive")
     parser.add_argument(
         "--template-zip",
-        required=True,
-        help="Exact path of the student-template ZIP inside the teacher archive",
+        help="Exact path of the student-template ZIP inside the teacher archive; prompts if omitted",
     )
     return parser
 
@@ -417,10 +416,17 @@ def _print_teacher_import_result(result: TeacherImportResult) -> None:
 
     :param result: Teacher import result to summarize.
     """
-    print(f"Imported teacher archive: {result.raw_archive}")
+    print(f"Teacher archive preserved at: {result.raw_archive}")
     print(f"Template ZIP: {result.template_member}")
-    print(f"Template files copied: {len(result.template_files)}")
-    print(f"Reference files copied: {len(result.reference_files)}")
+    print(
+        f"Template files imported to: {result.template_root} "
+        f"({len(result.template_files)} files)"
+    )
+    print(
+        f"Teacher reference files imported to: {result.reference_root} "
+        f"({len(result.reference_files)} files)"
+    )
+    print(f"Import metadata written to: {result.metadata_path}")
 
 
 def import_teacher_zip(arguments: Sequence[str]) -> int:
@@ -432,11 +438,91 @@ def import_teacher_zip(arguments: Sequence[str]) -> int:
     :raises ValueError: If either archive is invalid or unsafe.
     """
     args = _import_teacher_parser().parse_args(list(arguments))
+    try:
+        import questionary
+    except ImportError:
+        questionary = None
+
+    workspace_value = (
+        _clean_entered_value(args.workspace)
+        if args.workspace
+        else _select_workspace_interactively()
+    )
+    if args.teacher_zip:
+        teacher_zip_value = _clean_entered_value(args.teacher_zip)
+    elif questionary is None:
+        teacher_zip_value = _clean_entered_value(input("Teacher ZIP: "))
+    else:
+        teacher_zip_value = questionary.path("Teacher ZIP:").ask()
+        if teacher_zip_value is None:
+            raise ValueError("Teacher ZIP prompt was cancelled.")
+        teacher_zip_value = _clean_entered_value(teacher_zip_value)
+
+    if not workspace_value or not teacher_zip_value:
+        raise ValueError("Workspace and teacher ZIP are required.")
+
+    importer = TeacherImporter(teacher_zip_value, workspace_value, args.template_zip or "")
+    template_member = args.template_zip or _select_template_member(importer)
     result = TeacherImporter(
-        args.teacher_zip, args.workspace, args.template_zip
+        teacher_zip_value, workspace_value, template_member
     ).import_teacher_archive()
     _print_teacher_import_result(result)
     return 0
+
+
+def _select_template_member(importer: TeacherImporter) -> str:
+    """Select a nested student-template ZIP from teacher-archive candidates.
+
+    :param importer: Teacher archive importer used to discover candidates.
+    :return: Selected nested ZIP member name.
+    :raises ValueError: If no candidate exists or the selection is cancelled
+        or invalid.
+    """
+    candidates = importer.find_template_members()
+    if not candidates:
+        raise ValueError("The teacher archive contains no nested ZIP template candidates.")
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        print("Select the student template ZIP:")
+        for index, candidate in enumerate(candidates, start=1):
+            print(f"  {index}. {candidate}")
+        selection = input("Template ZIP number: ").strip()
+        try:
+            selected_index = int(selection) - 1
+        except ValueError as error:
+            raise ValueError("Template ZIP selection must be a number.") from error
+        if selected_index < 0 or selected_index >= len(candidates):
+            raise ValueError("Template ZIP selection is out of range.")
+        return candidates[selected_index]
+
+    try:
+        import questionary
+    except ImportError:
+        return candidates[0] if len(candidates) == 1 else _select_template_member_numbered(candidates)
+    selected = questionary.select(
+        "Select the student template ZIP:", choices=candidates
+    ).ask()
+    if selected is None:
+        raise ValueError("Template ZIP selection was cancelled.")
+    return selected
+
+
+def _select_template_member_numbered(candidates: list[str]) -> str:
+    """Select a template ZIP using a numbered fallback prompt.
+
+    :param candidates: Candidate nested template ZIP member names.
+    :return: Selected member name.
+    :raises ValueError: If the entered selection is invalid.
+    """
+    for index, candidate in enumerate(candidates, start=1):
+        print(f"  {index}. {candidate}")
+    selection = input("Template ZIP number: ").strip()
+    try:
+        selected_index = int(selection) - 1
+    except ValueError as error:
+        raise ValueError("Template ZIP selection must be a number.") from error
+    if selected_index < 0 or selected_index >= len(candidates):
+        raise ValueError("Template ZIP selection is out of range.")
+    return candidates[selected_index]
 
 
 def main(argv: Sequence[str] | None = None) -> int:

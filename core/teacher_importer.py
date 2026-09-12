@@ -17,6 +17,9 @@ class TeacherImportResult:
     template_member: str
     template_files: tuple[str, ...]
     reference_files: tuple[str, ...]
+    template_root: Path
+    reference_root: Path
+    metadata_path: Path
 
 
 class TeacherImporter:
@@ -105,8 +108,35 @@ class TeacherImporter:
             json.dump(metadata, file, indent=2)
             file.write("\n")
         return TeacherImportResult(
-            raw_archive, self.template_member, tuple(template_files), tuple(reference_files)
+            raw_archive,
+            self.template_member,
+            tuple(template_files),
+            tuple(reference_files),
+            template_root,
+            teacher_root,
+            references_root / "teacher_metadata.json",
         )
+
+    def find_template_members(self) -> list[str]:
+        """Find candidate nested ZIP files in the teacher archive.
+
+        :return: Safe, non-directory archive members whose names end in
+            ``.zip``.
+        :raises FileNotFoundError: If the teacher archive does not exist.
+        :raises ValueError: If the archive is malformed or contains an unsafe
+            path.
+        """
+        if not self.archive_path.is_file():
+            raise FileNotFoundError(f"Teacher ZIP '{self.archive_path}' was not found.")
+        try:
+            with ZipFile(self.archive_path) as archive:
+                return [
+                    member
+                    for member in self._safe_entries(archive)
+                    if member.lower().endswith(".zip")
+                ]
+        except BadZipFile as error:
+            raise ValueError(f"Teacher ZIP '{self.archive_path}' is not a valid ZIP file.") from error
 
     @staticmethod
     def _safe_entries(archive: ZipFile) -> list[str]:

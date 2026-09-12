@@ -108,8 +108,11 @@ warnings.
 
 ### Import teacher materials
 
-Import the teacher ZIP after creating a workspace. The template option is the
-exact member path of the student-template ZIP inside the teacher archive:
+Import the teacher ZIP after creating a workspace. The command interactively
+prompts for the workspace, teacher ZIP, and nested student-template ZIP. In a
+terminal, workspace and template choices use keyboard-navigable select prompts.
+The options can be supplied when scripting; `--template-zip` must be the exact
+member path of the student-template ZIP inside the teacher archive:
 
 ```bash
 python3 main.py import-teacher-zip \
