@@ -38,8 +38,8 @@ The TA has the following teacher-only materials:
 The TA must tell the application which file inside the teacher ZIP is the ZIP
 containing the student project template. The other teacher-archive artifacts
 are grading references: the spreadsheet is the final manual grading record,
-the solution source files provide a known-correct reference, and the expected
-output log supports program-output checks.
+the solution source files are a known-correct implementation for the TA's
+manual reference, and the expected output log supports program-output checks.
 
 ## Canvas submission-export assumptions
 
@@ -238,6 +238,10 @@ milestone configuration. This is expected when students modify a file that
 was present in the template. The workspace metadata should record that the
 student file replaced a grader file.
 
+The known-correct solution is manual reference material only. The application
+does not compile it, compare student code against it, or use it in automated
+grading.
+
 When practical, the grader should compare a submission with the original
 student template to identify missing, extra, and modified files. Byte-level
 differences should not automatically be treated as meaningful when line
@@ -270,7 +274,9 @@ student submitted.
 
 ### Reports and manual grading
 
-Reports are grading aids rather than the final gradebook. A per-submission report
+Reports are grading aids rather than the final gradebook. The current report
+format is a sectioned plain-text file with one report per submission, following
+the general style of the existing report reference. A per-submission report
 should provide:
 
 - Submission identifier, original filename, and source path.
@@ -278,6 +284,10 @@ should provide:
 - A concise criterion-by-criterion summary.
 - Evidence, including filenames and line numbers when available.
 - Build and runtime diagnostics.
+- A separate build-output log containing configuration, compiler, linker, and
+  build-system output.
+- A separate runtime-output log containing only the student's program output
+  and relevant execution diagnostics.
 - Checks that were skipped, disabled, or not applicable.
 - A clear distinction between failure, warning, and manual review.
 - A location for TA notes and overrides.
@@ -286,6 +296,12 @@ Scoring should be stored separately from report formatting. The spreadsheet
 should remain unchanged unless the TA intentionally updates it. Report
 criterion names and stable identifiers should align with the spreadsheet so
 results can be transcribed efficiently.
+
+The human-readable report may summarize or link to these logs, but build output
+and runtime output must not be merged into one log file. Each submission's log
+files should be stored with that submission's results and identified clearly
+in the report. The report should remain quick to scan for manual spreadsheet
+grading while retaining enough evidence for unusual cases.
 
 ## Exceptions, overrides, and reproducibility
 
@@ -367,16 +383,16 @@ production-ready:
    per-submission; future shared read-only caching is only an optimization.
 3. How should modified template files and omitted expected files affect
    grading? Extra files are reported and ignored by the current workflow.
-4. What execution isolation, timeout, and resource limits are acceptable on
-   the TA's machine?
-5. Should the known-correct solution be used for output comparison, tests,
-   structural comparison, or all three?
-6. What report format is fastest for the TA to use alongside the spreadsheet?
-7. What kinds of per-submission overrides are allowed, and how must they be
+4. **Milestone 2 design issue:** what execution isolation, timeout, and
+   resource limits are acceptable on the TA's machine? For milestone 1, the
+   baseline is separate per-submission workspaces and explicit handling so a
+   failed or hanging submission does not prevent the remaining submissions
+   from being processed.
+5. What kinds of per-submission overrides are allowed, and how must they be
    documented?
-8. If late submissions, resubmissions, or multiple Canvas exports matter,
+6. If late submissions, resubmissions, or multiple Canvas exports matter,
    what separate TA process will supply that information to the spreadsheet?
-9. How are rubric changes versioned after grading has begun?
+7. How are rubric changes versioned after grading has begun?
 
 ## Application requirements checklist for future changes
 
