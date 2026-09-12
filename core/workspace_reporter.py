@@ -105,7 +105,7 @@ class WorkspaceReporter:
                     f"Reporting {index}/{total} {submission_root.name}: "
                     f"build={outcome['build_status']} "
                     f"runtime={outcome['runtime_status']} "
-                    f"report={report_path}",
+                    f"report={self._display_workspace_path(report_path)}",
                     flush=True,
                 )
 
