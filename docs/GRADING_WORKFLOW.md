@@ -81,6 +81,65 @@ Sources: [Canvas instructor guidance on downloading all student
 submissions](https://community.instructure.com/en/kb/articles/660693-how-do-i-download-all-student-submissions-for-an-assignment)
 and [Canvas Submissions API documentation](https://canvas.instructure.com/doc/api/submissions.html).
 
+### Current first-milestone submission format
+
+The first milestone currently expects one required student file. The expected
+filename is defined by the reusable milestone configuration in the
+`milestones/` directory. Students may also submit an optional `README.md`. The
+configuration may be outdated when reused for a new assignment. For now, the
+grader should assume that the configuration matches the assignment, but should
+detect likely mismatches and notify the TA that the configuration file needs
+review. The notification should include specific details, such as the
+configured filename, files found in the teacher ZIP, and the affected
+submissions. Automatic configuration changes are out of scope for this
+temporary resolution. The exact Canvas archive structure is not yet considered
+stable, so the importer should be tolerant of wrapper folders and should
+preserve the raw archive for inspection.
+
+Based on current observations, Canvas modifies the downloaded filename by
+prefixing metadata before the filename supplied by the student. The observed
+shape is approximately:
+
+```text
+<canvas-prefix>_[LATE]_<student-filename>[-<number>].<extension>
+```
+
+The prefix may contain the student's first and last name and numeric values
+whose meaning is not currently relied upon. `[LATE]` may be absent. The
+optional `-<number>` appears to distinguish repeated submissions with the same
+filename. The grader should preserve the entire original filename and should
+not depend on understanding or perfectly parsing the Canvas-generated prefix.
+The student-supplied filename and extension are useful evidence, but the app
+still evaluates the extracted submission rather than identifying the student.
+
+Canvas's bulk export provides only the most recent submission. The grader
+should not imply that it has access to earlier attempts, even when the filename
+contains an attempt-like suffix.
+
+Students may accidentally submit a ZIP containing the requested file or an
+entire project instead of submitting only the requested file. For the first
+milestone, the importer should:
+
+- Detect a submitted ZIP when a direct required file is not present.
+- Check the root of the submitted ZIP for the filename specified by the
+  milestone configuration and the optional `README.md`.
+- Extract the needed root-level file(s) into the normalized submission
+  workspace when the selection is unambiguous.
+- Preserve the submitted ZIP and its internal paths for audit purposes.
+- Mark the submission as recovered from an archive in both the report and the
+  workspace metadata.
+- Flag files found below the ZIP root, ambiguous cases, and multiple plausible
+  required files for TA review instead of guessing.
+- Report extra files or a complete-project submission as a submission-structure
+  warning, even if the required file can be recovered.
+
+The importer does not need to support arbitrary nested project layouts. If a
+student's source file is inside another directory, the TA can manually unzip
+the student's submission and copy the source file directly into that
+submission's normalized workspace. The workspace and report should make this
+manual-repair path visible so the TA knows why the grading input differs from
+the original archive.
+
 ## Intended TA workflow
 
 1. The TA creates a grading workspace for the Canvas assignment (called a
@@ -115,7 +174,12 @@ The application should explicitly handle:
 - Extra top-level folders and nested submission folders.
 - Missing, empty, duplicated, or ambiguously named submissions.
 - Missing required files and unexpected extra files.
-- Nested ZIP files and non-source artifacts.
+- Submitted ZIP files whose expected source files are at the ZIP root.
+- Nested source files or project directories that require manual TA repair.
+- A first-milestone submission containing exactly one required file, with an
+  optional `README.md`.
+- A ZIP submitted in place of the requested file or a ZIP containing an entire
+  project.
 - Build products, editor metadata, and platform-specific files.
 - Student files that were provided by the template versus files the student
   was expected to create or modify.
@@ -255,8 +319,10 @@ Student ZIP + teacher ZIP + reference solution + rubric configuration
 These decisions should be resolved before the workflow is treated as
 production-ready:
 
-1. What exact archive layouts should be accepted automatically, and which
-   should require TA intervention?
+1. **Milestone 2 design issue:** whether the current root-level-only ZIP rule
+   should be expanded, and which additional layouts would justify that
+   complexity. For milestone 1, root-level-only extraction remains the active
+   rule and deeper layouts use the TA's manual-repair workflow.
 2. Which files from the teacher ZIP are copied into each submission, and which
    are used only for comparison or testing?
 3. How should modified template files, omitted files, and extra files affect
@@ -278,6 +344,8 @@ When proposing or implementing a feature, review whether it affects any of
 the following application and grading requirements:
 
 - The TA can import and understand the required input artifacts.
+- Reused configuration is assumed to match, but likely mismatches produce a
+  clear TA notification with supporting details.
 - The application evaluates submissions without needing to know student
   identities.
 - Reports reproduce the original Canvas submission filename so the TA can
