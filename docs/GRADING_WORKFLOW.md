@@ -312,6 +312,13 @@ files should be stored with that submission's results and identified clearly
 in the report. The report should remain quick to scan for manual spreadsheet
 grading while retaining enough evidence for unusual cases.
 
+Each report should include the rule/configuration version used for grading and
+the time the grading run occurred. Rule files should document their version
+and the date or time each version changed, using comments or a comparable
+annotation. If the rules change after a submission has been graded, previously
+completed submissions are not regraded; the new version applies only to future
+grading runs as directed by the TA.
+
 ## Exceptions, overrides, and reproducibility
 
 Unique edge cases are expected. The TA should be able to correct or annotate
@@ -404,7 +411,6 @@ production-ready:
 5. What kinds of per-submission finding corrections or annotations are allowed,
    and how must they be documented? The application does not assign points;
    the TA records points manually in the spreadsheet.
-6. How are rubric changes versioned after grading has begun?
 
 ## Application requirements checklist for future changes
 
@@ -429,6 +435,8 @@ the following application and grading requirements:
 - Reports provide evidence usable for manual spreadsheet grading.
 - A unique student edge case can be corrected locally and audibly.
 - Results can be reproduced from recorded inputs and configuration.
+- Reports include the rule version and grading time, and rule files document
+  when versions changed.
 - Documentation remains clear about what is automated versus manual.
 
 If a future prompt proposes a feature that conflicts with or leaves one of
