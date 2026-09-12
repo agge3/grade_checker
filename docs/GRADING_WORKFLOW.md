@@ -292,10 +292,12 @@ should provide:
 - A clear distinction between failure, warning, and manual review.
 - A location for TA notes and overrides.
 
-Scoring should be stored separately from report formatting. The spreadsheet
-should remain unchanged unless the TA intentionally updates it. Report
-criterion names and stable identifiers should align with the spreadsheet so
-results can be transcribed efficiently.
+The application does not calculate points or assign grades. It provides
+information and evidence for each criterion, and the TA decides the points
+manually in the grading spreadsheet. Report criterion names and stable
+identifiers should align with the spreadsheet so the TA can transfer findings
+efficiently. The spreadsheet should remain unchanged unless the TA
+intentionally updates it.
 
 The human-readable report may summarize or link to these logs, but build output
 and runtime output must not be merged into one log file. Each submission's log
@@ -305,14 +307,18 @@ grading while retaining enough evidence for unusual cases.
 
 ## Exceptions, overrides, and reproducibility
 
-Unique edge cases are expected. The TA should be able to correct the grading
-of one submission without changing the raw submission, silently changing the
-assignment configuration, or forcing an entire cohort to be graded again.
+Unique edge cases are expected. The TA should be able to correct or annotate
+the interpretation of one submission's findings without changing the raw
+submission, silently changing the assignment configuration, or forcing an
+entire cohort to be graded again. Because the application does not calculate
+points, an override does not change an application score; it records the TA's
+review of the reported evidence for use when the TA assigns spreadsheet
+points.
 
 The design should support:
 
 - Per-submission notes.
-- Per-criterion overrides with an explanation.
+- Per-criterion finding corrections or annotations with an explanation.
 - A record of the original automated result.
 - Rerunning only one submission when possible.
 - Rerunning the cohort with a new configuration version.
@@ -388,8 +394,9 @@ production-ready:
    baseline is separate per-submission workspaces and explicit handling so a
    failed or hanging submission does not prevent the remaining submissions
    from being processed.
-5. What kinds of per-submission overrides are allowed, and how must they be
-   documented?
+5. What kinds of per-submission finding corrections or annotations are allowed,
+   and how must they be documented? The application does not assign points;
+   the TA records points manually in the spreadsheet.
 6. If late submissions, resubmissions, or multiple Canvas exports matter,
    what separate TA process will supply that information to the spreadsheet?
 7. How are rubric changes versioned after grading has begun?
@@ -404,6 +411,8 @@ the following application and grading requirements:
   clear TA notification with supporting details.
 - The application evaluates submissions without needing to know student
   identities.
+- The application reports findings and evidence but does not calculate points
+  or assign grades.
 - Reports reproduce the original Canvas submission filename so the TA can
   locate the artifact in the original export.
 - Original inputs remain preserved and traceable.
