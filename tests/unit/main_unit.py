@@ -117,6 +117,7 @@ class WorkspaceReportTests(unittest.TestCase):
                 "File Headers", "Methods", "GTest Check", "Output Check",
             ):
                 self.assertIn(section, report_text)
+            self.assertIn("Summary: 0 found, 0 missing.", report_text)
             self.assertNotIn("Raw Build Output", report_text)
             self.assertNotIn("Runtime Output", report_text)
             notes = workspace / "reports" / result.submissions[0].identifier / "notes.md"

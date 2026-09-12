@@ -44,13 +44,16 @@ class WorkspaceReporter:
         self.runtime_timeout = runtime_timeout
         self.rule_configuration = "workspace metadata"
 
-    def report(self) -> WorkspaceReportResult:
+    def report(self, submission: str | None = None) -> WorkspaceReportResult:
         """Prepare, build, run, and report every normalized submission.
 
+        :param submission: Optional normalized submission identifier. When
+            provided, only that submission is reported.
         :return: Paths to per-submission reports, the summary, and similarity
             report.
         :raises FileNotFoundError: If the workspace is not initialized.
-        :raises ValueError: If the runtime timeout is not positive.
+        :raises ValueError: If the runtime timeout is not positive or the
+            selected submission identifier is invalid.
         """
         if self.runtime_timeout <= 0:
             raise ValueError("Runtime timeout must be positive.")
@@ -71,10 +74,26 @@ class WorkspaceReporter:
         run_time = datetime.now(timezone.utc).isoformat()
         reports: list[Path] = []
         submissions_root = self.workspace / "submissions"
+        if submission is not None and not submissions_root.is_dir():
+            raise ValueError(
+                f"Unknown submission '{submission}': the workspace has no submissions."
+            )
         if submissions_root.is_dir():
-            submission_roots = sorted(
+            available_submission_roots = sorted(
                 path for path in submissions_root.iterdir() if path.is_dir()
             )
+            if submission is None:
+                submission_roots = available_submission_roots
+            else:
+                submission_root = submissions_root / submission
+                if submission_root not in available_submission_roots:
+                    available = ", ".join(
+                        path.name for path in available_submission_roots
+                    ) or "none"
+                    raise ValueError(
+                        f"Unknown submission '{submission}'. Available submissions: {available}."
+                    )
+                submission_roots = [submission_root]
             total = len(submission_roots)
             for index, submission_root in enumerate(submission_roots, start=1):
                 metadata_path = submission_root / "submission_metadata.json"
@@ -491,13 +510,27 @@ class WorkspaceReporter:
                 f"(automated={criterion['automated']}): {criterion['evidence']}"
             )
         lines.extend(["", "File Headers", "------------"])
-        lines.extend(str(item) for item in legacy_details["headers"])
+        headers = legacy_details["headers"]
+        assert isinstance(headers, list)
+        for index, item in enumerate(headers, start=1):
+            lines.append(f"{index}. {item}")
+        header_found = sum(str(item).startswith("FOUND") for item in headers)
+        header_missing = sum(str(item).startswith("MISSING") for item in headers)
+        lines.append(
+            f"Summary: {header_found} found, {header_missing} missing."
+        )
         lines.extend(["", "Methods", "-------"])
         methods = legacy_details["methods"]
         assert isinstance(methods, dict)
         for clazz, method_results in methods.items():
             lines.append(f"{clazz}:")
-            lines.extend(f"  {result}" for result in method_results)
+            found = sum(str(result).startswith("FOUND") for result in method_results)
+            missing = sum(str(result).startswith("MISSING") for result in method_results)
+            lines.extend(
+                f"  {index}. {result}"
+                for index, result in enumerate(method_results, start=1)
+            )
+            lines.append(f"  Summary: {found} found, {missing} missing.")
         lines.extend([
             "", "GTest Check", "-----------", str(legacy_details["gtest_check"]),
             "", "Output Check", "------------", str(legacy_details["output_check"]),

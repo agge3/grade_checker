@@ -147,6 +147,18 @@ workspace at report time, and writes per-submission reports plus
 python3 main.py report --workspace grading-workspaces/milestone2
 ```
 
+To report one normalized submission from a scripted run:
+
+```bash
+python3 main.py report \
+  --workspace grading-workspaces/milestone2 \
+  --submission student01
+```
+
+When `report` is run without `--workspace`, the interactive workflow asks
+whether to report all submissions or choose one from the workspace. Reporting
+all submissions is the default.
+
 Each submission report directory includes a guided `notes.md` for TA-written
 observations. The generated `report.txt` contains automated findings and
 evidence, including file-header and configured-method details, GTest/extra-credit

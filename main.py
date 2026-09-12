@@ -313,6 +313,79 @@ def _select_workspace_interactively() -> str:
     return selected
 
 
+def _existing_submissions(workspace: str | Path) -> list[str]:
+    """Find normalized submission identifiers in a grading workspace.
+
+    :param workspace: Initialized grading workspace to inspect.
+    :return: Sorted submission directory names containing submission metadata.
+    """
+    submissions_root = Path(workspace).expanduser() / "submissions"
+    if not submissions_root.is_dir():
+        return []
+    return sorted(
+        path.name
+        for path in submissions_root.iterdir()
+        if path.is_dir() and (path / "submission_metadata.json").is_file()
+    )
+
+
+def _select_submission_interactively(workspace: str | Path) -> str | None:
+    """Choose all submissions or one submission for an interactive report.
+
+    :param workspace: Initialized grading workspace containing submissions.
+    :return: Selected identifier, or ``None`` to report all submissions.
+    :raises ValueError: If the selection is cancelled or invalid.
+    """
+    submissions = _existing_submissions(workspace)
+    if not submissions:
+        return None
+    all_label = "All submissions"
+    choices = [all_label, *submissions]
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        print("Report which submissions? (default: all)")
+        for index, choice in enumerate(choices, start=1):
+            print(f"  {index}. {choice}")
+        selection = input("Submission number [1]: ").strip() or "1"
+        try:
+            selected_index = int(selection) - 1
+        except ValueError as error:
+            raise ValueError("Submission selection must be a number.") from error
+        if selected_index < 0 or selected_index >= len(choices):
+            raise ValueError("Submission selection is out of range.")
+        selected = choices[selected_index]
+    else:
+        try:
+            import questionary
+        except ImportError:
+            return _select_submission_interactively_fallback(choices)
+        selected = questionary.select(
+            "Report which submissions?", choices=choices, default=all_label
+        ).ask()
+        if selected is None:
+            raise ValueError("Submission selection was cancelled.")
+    return None if selected == all_label else selected
+
+
+def _select_submission_interactively_fallback(choices: list[str]) -> str | None:
+    """Select a submission using a numbered prompt when no UI helper exists.
+
+    :param choices: Choices with ``All submissions`` as the first item.
+    :return: Selected identifier, or ``None`` for all submissions.
+    :raises ValueError: If the selection is invalid.
+    """
+    print("Report which submissions?")
+    for index, choice in enumerate(choices, start=1):
+        print(f"  {index}. {choice}")
+    selection = input("Submission number [1]: ").strip() or "1"
+    try:
+        selected_index = int(selection) - 1
+    except ValueError as error:
+        raise ValueError("Submission selection must be a number.") from error
+    if selected_index < 0 or selected_index >= len(choices):
+        raise ValueError("Submission selection is out of range.")
+    return None if selected_index == 0 else choices[selected_index]
+
+
 def import_submissions(arguments: Sequence[str]) -> int:
     """Import student-canvas-submissions into an initialized grading workspace.
 
@@ -539,6 +612,10 @@ def _report_parser() -> argparse.ArgumentParser:
         "--workspace",
         help="Initialized grading workspace directory; prompts if omitted",
     )
+    parser.add_argument(
+        "--submission",
+        help="Report one normalized submission identifier instead of all submissions",
+    )
     return parser
 
 
@@ -549,12 +626,16 @@ def report(arguments: Sequence[str]) -> int:
     :return: Zero after reporting completes.
     """
     args = _report_parser().parse_args(list(arguments))
+    interactive_workspace = not args.workspace
     workspace = (
         _clean_entered_value(args.workspace)
         if args.workspace
         else _select_workspace_interactively()
     )
-    result = WorkspaceReporter(workspace).report()
+    submission = args.submission
+    if submission is None and interactive_workspace:
+        submission = _select_submission_interactively(workspace)
+    result = WorkspaceReporter(workspace).report(submission=submission)
     _print_workspace_report_result(result)
     return 0
 
