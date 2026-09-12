@@ -7,8 +7,9 @@ repository fetching, source inspection, building, grading, and reporting.
 
 ```text
 main.py
-  |◊
-  +-- config.py ---------------- reads and validates milestone JSON
+  |
+  +-- config.py ---------------- loads and validates milestone JSON into a
+  |                              typed Config object
   |
   +-- core.fetch.Fetcher ------- finds GitHub repositories and clones them
   |
@@ -27,8 +28,22 @@ main.py
 ## Command flow
 
 The required command-line argument identifies a milestone configuration. For
-example, `milestone2-hugh` is converted to `milestone2`, then
-`config.merge()` loads `milestones/_milestone2-hugh.json`.
+example, `milestone2-hugh` is converted to `milestone2` for grading paths, and
+`config.load_config("milestone2-hugh")` loads
+`milestones/_milestone2-hugh.json`.
+
+`load_config()` validates the JSON and returns a `Config` object. `Config`
+implements the mapping interface, so existing consumers can use expressions
+such as `cfg["options"]["build"]`. The typed `cfg.data` property exposes the
+declared `ConfigData` structure, which is composed of `TypedDict` definitions
+for options, grading settings, fetching settings, extra credit, and method
+definitions.
+
+Configuration is passed explicitly to application components. `Fetcher`,
+`Build`, `Grader`, and `Reporter2` receive the configuration they need instead
+of reading a mutable module-level `_config` variable. This makes separate
+configuration instances possible and keeps configuration state visible in the
+call graph.
 
 The supported flags are independent and may be combined:
 
@@ -44,7 +59,8 @@ The supported flags are independent and may be combined:
 
 ## Configuration model
 
-Milestone JSON files provide the application’s dependency-injection data:
+Milestone JSON files provide the application’s dependency-injection data. The
+loader maps their contents to the typed `ConfigData` structure:
 
 - `prof`, `org`, `glob`, and `clone` control repository discovery.
 - `classes` and `methods` describe the C++ interfaces expected from students.
