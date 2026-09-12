@@ -34,12 +34,17 @@ The TA has the following teacher-only materials:
 - A teacher ZIP archive containing the grading spreadsheet, solution source
   files, an expected program-output log, and a ZIP of the student project
   template.
+- The instructor-provided `CodeAnalyzer` package for comparing submission
+  source-code similarities. This package must not be modified by the Grade
+  Checker.
 
 The TA must tell the application which file inside the teacher ZIP is the ZIP
 containing the student project template. The other teacher-archive artifacts
 are grading references: the spreadsheet is the final manual grading record,
 the solution source files are a known-correct implementation for the TA's
 manual reference, and the expected output log supports program-output checks.
+The `CodeAnalyzer` package is used only for similarity analysis, and its output
+is informational evidence for the TA.
 
 ## Canvas submission-export assumptions
 
@@ -242,6 +247,67 @@ The known-correct solution is manual reference material only. The application
 does not compile it, compare student code against it, or use it in automated
 grading.
 
+### Submission similarity analysis
+
+The application must invoke the instructor-provided `CodeAnalyzer` to compare
+student submission source-code similarities. Its source files and behavior are
+external inputs and must remain unchanged. The analyzer's output is evidence
+for the TA, not a point calculation or automatic academic-integrity finding.
+
+Similarity analysis must use a student-only submissions area separate from the
+normalized build workspaces. A suitable workspace layout is:
+
+```text
+workspace/
+  submissions/
+    submission-1/
+      expected-source.cpp
+    submission-2/
+      expected-source.cpp
+  build-workspaces/
+    submission-1/
+      template and grader files
+      student file overlaid on the template
+      build/
+    submission-2/
+      template and grader files
+      student file overlaid on the template
+      build/
+  reports/
+    submission-1/
+      report.txt
+      build-output.log
+      runtime-output.log
+    submission-2/
+      report.txt
+      build-output.log
+      runtime-output.log
+    similarity-report.txt
+```
+
+`workspace/submissions/` is the normalized student-only view and can be passed
+directly to `CodeAnalyzer` as its `inputRoot`. Each directory should contain
+only source files that came from that submission, including a recovered source
+file when the TA has manually repaired a submission. It must not contain copied
+grader/template source files, the known-correct solution, build output, or
+unrelated files. Otherwise, identical instructor files could inflate
+similarity results.
+
+The provided analyzer currently expects one directory per submission,
+recursively reads C++ source extensions, compares normalized token sets, and
+writes a cohort-level text report with pairwise percentages and possible-copy
+flags. The Grade Checker should preserve that output as a separate similarity
+report and identify which submission directories were analyzed. It should not
+relabel those directories as verified students or assign points from the
+similarity percentages.
+
+The provided analyzer currently obtains its JSON configuration through a
+hard-coded source-level path, while the JSON supplies its input root and output
+report path. Since the analyzer must not be modified, integrating it requires
+an execution/staging arrangement that satisfies that interface or a documented
+TA-operated invocation. This is an implementation integration issue, not a
+reason to alter the instructor-provided package.
+
 When practical, the grader should compare a submission with the original
 student template to identify missing, extra, and modified files. Byte-level
 differences should not automatically be treated as meaningful when line
@@ -311,6 +377,11 @@ and runtime output must not be merged into one log file. Each submission's log
 files should be stored with that submission's results and identified clearly
 in the report. The report should remain quick to scan for manual spreadsheet
 grading while retaining enough evidence for unusual cases.
+
+The workspace uses `reports/` as the output root. Each submission has its own
+directory containing `report.txt`, `build-output.log`, and
+`runtime-output.log`. The cohort-level `similarity-report.txt` is stored
+directly under `reports/` because it compares submissions with one another.
 
 Each report should include the rule/configuration version used for grading and
 the time the grading run occurred. Rule files should document their version
@@ -424,6 +495,8 @@ the following application and grading requirements:
   identities.
 - The application reports findings and evidence but does not calculate points
   or assign grades.
+- The provided `CodeAnalyzer` runs unchanged against student-submitted source
+  files only, and its similarity report is presented as TA evidence.
 - The TA evaluates every submission as on time; the instructor handles any
   late-submission score adjustment separately.
 - Reports reproduce the original Canvas submission filename so the TA can
