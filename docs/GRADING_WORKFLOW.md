@@ -136,7 +136,8 @@ milestone, the importer should:
 - Flag files found below the ZIP root, ambiguous cases, and multiple plausible
   required files for TA review instead of guessing.
 - Report extra files or a complete-project submission as a submission-structure
-  warning, even if the required file can be recovered.
+  warning, even if the required file can be recovered. Extra files are ignored
+  for the normalized build and automated grading.
 
 The importer does not need to support arbitrary nested project layouts. If a
 student's source file is inside another directory, the TA can manually unzip
@@ -191,6 +192,9 @@ The application should explicitly handle:
 - Student files that were provided by the template versus files the student
   was expected to create or modify.
 - Duplicate or ambiguous submission filenames.
+- Extra submitted files, which should be reported to the TA and ignored by the
+  normalized build unless an assignment-specific criterion explicitly uses
+  them.
 
 The application should preserve the original archive, record the source name
 and original filename for each submission, and assign a stable internal
@@ -361,8 +365,8 @@ production-ready:
    template file except files ending in `.grader-ignore` into each submission
    workspace and mark those files as grader files. Build output remains
    per-submission; future shared read-only caching is only an optimization.
-3. How should modified template files, omitted files, and extra files affect
-   grading?
+3. How should modified template files and omitted expected files affect
+   grading? Extra files are reported and ignored by the current workflow.
 4. What execution isolation, timeout, and resource limits are acceptable on
    the TA's machine?
 5. Should the known-correct solution be used for output comparison, tests,
