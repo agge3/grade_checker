@@ -110,6 +110,9 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertEqual((build_workspace / "student.cpp").read_text(), "student")
             self.assertEqual(len(report_result.reports), 1)
             report_text = report_result.reports[0].read_text(encoding="utf-8")
+            self.assertIn(f"Workspace path prefix: {workspace}", report_text)
+            self.assertIn("<workspace-path>/reports/student/build-output.log", report_text)
+            self.assertNotIn(f"Student workspace: {workspace}", report_text)
             for section in (
                 "File Headers", "Methods", "GTest Check", "Output Check",
             ):

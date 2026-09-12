@@ -564,11 +564,28 @@ def _print_workspace_report_result(result: WorkspaceReportResult) -> None:
 
     :param result: Workspace report result to summarize.
     """
+    print(f"Workspace path prefix: {result.workspace}")
     print(f"Workspace reports generated: {len(result.reports)}")
     for report_path in result.reports:
-        print(f"  Report: {report_path}")
-    print(f"Summary report: {result.summary}")
-    print(f"Similarity report: {result.similarity_report}")
+        print(f"  Report: {_display_workspace_path(result.workspace, report_path)}")
+    print(f"Summary report: {_display_workspace_path(result.workspace, result.summary)}")
+    print(
+        "Similarity report: "
+        f"{_display_workspace_path(result.workspace, result.similarity_report)}"
+    )
+
+
+def _display_workspace_path(workspace: Path, path: Path) -> str:
+    """Render a workspace path using a short, recoverable display form.
+
+    :param workspace: Absolute workspace root printed as the path prefix.
+    :param path: Path inside the workspace to render.
+    :return: Workspace-relative path with a ``<workspace-path>/`` hint.
+    """
+    try:
+        return f"<workspace-path>/{path.relative_to(workspace).as_posix()}"
+    except ValueError:
+        return str(path)
 
 
 def _run_report(milestone: str, cfg: config.Config) -> None:

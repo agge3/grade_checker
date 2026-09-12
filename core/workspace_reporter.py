@@ -111,10 +111,12 @@ class WorkspaceReporter:
 
         summary = reports_root / "summary.txt"
         summary.write_text(
-            f"Workspace: {self.workspace}\n"
+            f"Workspace path prefix: {self.workspace}\n"
             f"Run time (UTC): {run_time}\n"
             f"Submissions reported: {len(reports)}\n"
-            + "\n".join(f"- {path}" for path in reports)
+            + "\n".join(
+                f"- {self._display_workspace_path(path)}" for path in reports
+            )
             + "\n",
             encoding="utf-8",
         )
@@ -122,6 +124,18 @@ class WorkspaceReporter:
         return WorkspaceReportResult(
             self.workspace, tuple(reports), summary, similarity_report
         )
+
+    def _display_workspace_path(self, path: Path) -> str:
+        """Render a workspace path relative to the reported workspace root.
+
+        :param path: Path located inside this workspace.
+        :return: Short path with a ``<workspace-path>/`` prefix hint, or the
+            original path when it is outside the workspace.
+        """
+        try:
+            return f"<workspace-path>/{path.relative_to(self.workspace).as_posix()}"
+        except ValueError:
+            return str(path)
 
     def _process_submission(
         self,
@@ -164,13 +178,13 @@ class WorkspaceReporter:
             {
                 "id": "build.success",
                 "status": build_status,
-                "evidence": str(build_log),
+                "evidence": self._display_workspace_path(build_log),
                 "automated": True,
             },
             {
                 "id": "runtime.execution",
                 "status": runtime_status,
-                "evidence": str(runtime_log),
+                "evidence": self._display_workspace_path(runtime_log),
                 "automated": True,
             },
             {
@@ -207,6 +221,7 @@ class WorkspaceReporter:
             overrides.write_text("{}\n", encoding="utf-8")
         return {
             "metadata": metadata,
+            "workspace_root": self.workspace,
             "student_root": submission_root,
             "build_root": build_root,
             "build_status": build_status,
@@ -460,11 +475,12 @@ class WorkspaceReporter:
         assert isinstance(legacy_details, dict)
         lines = [
             "Submission report", "=================",
+            f"Workspace path prefix: {outcome['workspace_root']}",
             f"Submission identifier: {metadata.get('identifier', report_path.parent.name)}",
             f"Original filename: {metadata.get('original_filename', '')}",
             f"Source archive: {metadata.get('source_archive', '')}",
-            f"Student workspace: {outcome['student_root']}",
-            f"Build workspace: {outcome['build_root']}",
+            f"Student workspace: {WorkspaceReporter._display_report_path(outcome['workspace_root'], outcome['student_root'])}",
+            f"Build workspace: {WorkspaceReporter._display_report_path(outcome['workspace_root'], outcome['build_root'])}",
             f"Rule/configuration: {metadata.get('rule_configuration', 'workspace metadata')}",
             f"Run time (UTC): {metadata.get('last_reported_at', '')}", "",
             "Criteria", "--------",
@@ -485,12 +501,26 @@ class WorkspaceReporter:
         lines.extend([
             "", "GTest Check", "-----------", str(legacy_details["gtest_check"]),
             "", "Output Check", "------------", str(legacy_details["output_check"]),
-            "", f"Build log: {outcome['build_log']}",
-            f"Runtime log: {outcome['runtime_log']}",
-            f"TA notes: {report_path.parent / 'notes.md'}",
-            f"TA overrides: {report_path.parent / 'overrides.json'}",
+            "", f"Build log: {WorkspaceReporter._display_report_path(outcome['workspace_root'], outcome['build_log'])}",
+            f"Runtime log: {WorkspaceReporter._display_report_path(outcome['workspace_root'], outcome['runtime_log'])}",
+            f"TA notes: {WorkspaceReporter._display_report_path(outcome['workspace_root'], report_path.parent / 'notes.md')}",
+            f"TA overrides: {WorkspaceReporter._display_report_path(outcome['workspace_root'], report_path.parent / 'overrides.json')}",
         ])
         report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    @staticmethod
+    def _display_report_path(workspace_root: Path, path: Path) -> str:
+        """Render a report path using the report's workspace prefix hint.
+
+        :param workspace_root: Absolute workspace root shown in the report.
+        :param path: Path to render.
+        :return: Workspace-relative display path, or the original path when it
+            is outside the workspace.
+        """
+        try:
+            return f"<workspace-path>/{path.relative_to(workspace_root).as_posix()}"
+        except ValueError:
+            return str(path)
 
     def _write_similarity_report(self, reports_root: Path, run_time: str) -> Path:
         """Write a separate cohort similarity-analysis status report.

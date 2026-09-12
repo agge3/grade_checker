@@ -155,6 +155,9 @@ remain available in the linked log files.
 Manual notes should go in `notes.md`, while structured corrections belong in
 `overrides.json`.
 
+Console output and reports show the absolute workspace path once as a path
+prefix; paths inside the workspace are then displayed as `<workspace-path>/...`.
+
 Use the explicit reporting command for new invocations. Without a milestone,
 it presents the available milestone configurations as a keyboard-navigable
 selection prompt:
