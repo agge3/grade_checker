@@ -31,10 +31,15 @@ input and report problems clearly.
 The TA has the following teacher-only materials:
 
 - A ZIP archive containing all student submissions exported from Canvas.
-- A teacher ZIP archive containing the project template and instructor-provided
-  files.
-- An instructor spreadsheet used as the final grading record.
-- One known-correct implementation of the assignment.
+- A teacher ZIP archive containing the grading spreadsheet, solution source
+  files, an expected program-output log, and a ZIP of the student project
+  template.
+
+The TA must tell the application which file inside the teacher ZIP is the ZIP
+containing the student project template. The other teacher-archive artifacts
+are grading references: the spreadsheet is the final manual grading record,
+the solution source files provide a known-correct reference, and the expected
+output log supports program-output checks.
 
 ## Canvas submission-export assumptions
 
@@ -144,8 +149,9 @@ the original archive.
 
 1. The TA creates a grading workspace for the Canvas assignment (called a
    milestone by the current implementation).
-2. The TA imports the student-submission ZIP and teacher ZIP, and associates
-   the reference solution and grading spreadsheet with the workspace.
+2. The TA imports the student-submission ZIP and teacher ZIP, identifies the
+   template ZIP inside the teacher ZIP, and associates the reference solution,
+   expected-output log, and grading spreadsheet with the workspace.
 3. The application validates and preserves the original inputs.
 4. The application discovers individual submissions and creates an isolated,
    normalized workspace for each one.
@@ -180,6 +186,7 @@ The application should explicitly handle:
   optional `README.md`.
 - A ZIP submitted in place of the requested file or a ZIP containing an entire
   project.
+- Template files ending in `.grader-ignore`, which must not be copied.
 - Build products, editor metadata, and platform-specific files.
 - Student files that were provided by the template versus files the student
   was expected to create or modify.
@@ -191,14 +198,41 @@ submission identifier. It should not assign a student identity.
 
 ### Template and instructor-provided files
 
-The teacher ZIP is assignment input and must have an explicit file policy.
-Each relevant file should be classified as required, instructor-provided,
-student-modifiable, forbidden to modify, optional, or ignored.
+The selected student-template ZIP is the source of the grader files needed to
+build submissions. Every file in that template is copied into every
+submission's normalized workspace and marked as a grader-provided file. Any
+file whose name ends with `.grader-ignore` is excluded from copying. This rule
+applies to ignored files wherever they occur in the template archive.
 
-The existing `project_fhs` concept represents instructor-provided files that
-can be made available in a student's normalized workspace. The workflow must
-make clear whether such files are copied before building, included only for
-comparison, or excluded from grading.
+The teacher ZIP itself, the grading spreadsheet, the solution source files,
+and the expected-output log are not copied into student build workspaces unless
+an assignment-specific check explicitly requires a separate reference input.
+The existing `project_fhs` concept represents the template files that can be
+made available in each student's normalized workspace.
+
+The workspace should retain provenance for copied files so reports and later
+inspection can distinguish grader files from student-submitted files. The
+application should also report how many template files were copied and how
+many `.grader-ignore` files were excluded.
+
+Instructor-provided source and build-support files should be treated
+separately from build output. The safe default is to give each submission its
+own complete build workspace, containing the normalized student files and the
+instructor files needed to compile them. A shared read-only cache of unchanged
+instructor files may be an implementation optimization, but compiled objects,
+executables, generated files, and logs must not be shared between submissions.
+This prevents stale artifacts or one student's changes from affecting another
+student's build and makes a single-submission rerun reproducible.
+
+For the initial implementation, copying the selected template files into each
+submission's normalized workspace is the simplest policy. The application
+should record which files were supplied by the teacher and which came from the
+submission. A single common build directory for all students is not the
+default workflow. Normalization should copy grader files first, then overlay
+the student's submitted file at the normalized destination path defined by the
+milestone configuration. This is expected when students modify a file that
+was present in the template. The workspace metadata should record that the
+student file replaced a grader file.
 
 When practical, the grader should compare a submission with the original
 student template to identify missing, extra, and modified files. Byte-level
@@ -323,8 +357,10 @@ production-ready:
    should be expanded, and which additional layouts would justify that
    complexity. For milestone 1, root-level-only extraction remains the active
    rule and deeper layouts use the TA's manual-repair workflow.
-2. Which files from the teacher ZIP are copied into each submission, and which
-   are used only for comparison or testing?
+2. **Build-workspace design:** the current behavior is to copy every selected
+   template file except files ending in `.grader-ignore` into each submission
+   workspace and mark those files as grader files. Build output remains
+   per-submission; future shared read-only caching is only an optimization.
 3. How should modified template files, omitted files, and extra files affect
    grading?
 4. What execution isolation, timeout, and resource limits are acceptable on
