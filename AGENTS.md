@@ -71,13 +71,20 @@ and milestone configuration files under `milestones/`.
 
 - Keep architecture documentation in `ARCHITECTURE.md`.
 - Keep user-facing setup and usage instructions in `README.md`.
+- Whenever a change affects architecture, configuration, public APIs,
+  workflows, directory layout, or user-facing behavior, update the relevant
+  documentation in the same change.
+- Keep `ARCHITECTURE.md` synchronized with component names, data flow,
+  configuration flow, and API relationships.
+- Keep `README.md` synchronized with setup and usage behavior.
+- Review documentation for references to renamed or removed files, functions,
+  classes, and commands before finishing.
+- Treat stale documentation as an incomplete task.
 - Use Markdown headings with a blank line before their content.
 - Prefer concise explanations, diagrams, and examples where they clarify the
   workflow.
 - Document known limitations with a clear explanation rather than leaving only
   ambiguous comments such as `xxx` or `TODO`.
-- 
-
 ## Testing and verification
 
 - Run the relevant unit tests after code changes.
@@ -95,3 +102,12 @@ and milestone configuration files under `milestones/`.
 - When documenting a bug without fixing it, use a nearby `BUG:` comment that
   explains the actual failure and affected behavior.
 - Summarize changed files and verification results in the final response.
+
+## Definition of done
+
+- Code conventions were followed.
+- New functions have type hints and Sphinx-style docstrings.
+- Related documentation was updated when behavior or structure changed.
+- Relevant tests or syntax checks were run.
+- `git diff --check` passes.
+- The final response identifies changed documentation files.
