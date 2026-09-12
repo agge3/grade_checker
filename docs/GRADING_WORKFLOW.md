@@ -122,6 +122,13 @@ not depend on understanding or perfectly parsing the Canvas-generated prefix.
 The student-supplied filename and extension are useful evidence, but the app
 still evaluates the extracted submission rather than identifying the student.
 
+For internal workspace naming, use the student's first name, last name, and
+the two Canvas-generated numeric values. Exclude the optional `[LATE]` marker
+and a trailing duplicate-attempt suffix such as `-2`. The full original
+filename remains available in metadata and reports. If removing those markers
+produces a name collision, the application must report the collision and use a
+deterministic disambiguation that does not discard either submission.
+
 Canvas's bulk export provides only the most recent submission. The grader
 should not imply that it has access to earlier attempts, even when the filename
 contains an attempt-like suffix.
@@ -153,14 +160,16 @@ the original archive.
 
 ## Intended TA workflow
 
-1. The TA creates a grading workspace for the Canvas assignment (called a
-   milestone by the current implementation).
-2. The TA imports the student-submission ZIP and teacher ZIP, identifies the
-   template ZIP inside the teacher ZIP, and associates the reference solution,
-   expected-output log, and grading spreadsheet with the workspace.
+1. The TA invokes the application's workspace-creation CLI command.
+2. The application interactively prompts the TA for the student-submission ZIP,
+   teacher ZIP, and the template ZIP's location inside the teacher ZIP. The TA
+   also associates the reference solution, expected-output log, and grading
+   spreadsheet with the workspace.
 3. The application validates and preserves the original inputs.
 4. The application discovers individual submissions and creates an isolated,
-   normalized workspace for each one.
+   normalized workspace for each one. The submission's internal name is based
+   on the Canvas-generated filename metadata, excluding the optional `[LATE]`
+   marker and the optional duplicate-attempt suffix such as `-2`.
 5. The application applies the assignment configuration and instructor-provided
    files, then runs the enabled checks.
 6. The application builds and, where applicable, executes each submission with
@@ -197,6 +206,8 @@ The application should explicitly handle:
 - Student files that were provided by the template versus files the student
   was expected to create or modify.
 - Duplicate or ambiguous submission filenames.
+- Internal-name collisions after removing `[LATE]` and duplicate-attempt
+  suffixes.
 - Extra submitted files, which should be reported to the TA and ignored by the
   normalized build unless an assignment-specific criterion explicitly uses
   them.

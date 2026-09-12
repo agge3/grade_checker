@@ -17,6 +17,9 @@ main.py
   |
   +-- core.fetch.Fetcher ------- finds GitHub repositories and clones them
   |
+  +-- core.submission_importer -- preserves Canvas archives and normalizes
+  |                                submissions into isolated workspaces
+  |
   +-- core.build.Build --------- copies support files, configures CMake,
   |                              builds, and runs each submission
   |
@@ -63,6 +66,13 @@ The supported flags are independent and may be combined:
 
 ## Configuration model
 
+`SubmissionImporter` supports the workspace-creation workflow. It preserves
+the input archive under `raw/`, creates normalized directories under
+`submissions/`, and records provenance and warnings in
+`submission_metadata.json`. Submitted ZIPs are recovered only when the
+configured required file is unambiguous at the ZIP root; extra or nested files
+remain warnings for TA review.
+
 Milestone JSON files provide the application’s dependency-injection data. The
 loader maps their contents to the typed `ConfigData` structure:
 
@@ -96,8 +106,9 @@ file discovery and extra-credit checks.
 
 ## Current implementation boundaries
 
-`main.py`, `config.py`, `core/build.py`, `core/fetch.py`, `core/grader.py`,
-and `core/reporter2.py` form the intended current application. `grader_v.py`,
+`main.py`, `config.py`, `core/build.py`, `core/fetch.py`,
+`core/submission_importer.py`, `core/grader.py`, and `core/reporter2.py` form
+the intended current application. `grader_v.py`,
 `core/new_fetch.py`, `core/script_runner.py`, `core/spreadsheet.py`, and the
 `old/` directory are experimental, obsolete, or incomplete implementations and
 are not part of the normal `main.py` workflow.

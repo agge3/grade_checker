@@ -96,6 +96,12 @@ See [docs/GRADING_WORKFLOW.md](docs/GRADING_WORKFLOW.md) for the grading
 context, TA workflow, application requirements, edge cases, and open design
 decisions.
 
+The submission archive importer is available as
+`core.submission_importer.SubmissionImporter`. Give it the Canvas ZIP, an
+output directory, and the milestone's required filename. It preserves the raw
+ZIP and creates normalized workspaces under `submissions/`, with provenance in
+`submission_metadata.json`.
+
 ## TODO
  * m3 onwards has a master _milestoneX.json schema change to allow for multiple
    files. refactor previous milestones to use new multiple file schema
