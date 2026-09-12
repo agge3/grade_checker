@@ -20,6 +20,7 @@ from typing import Sequence
 from core.workspace import Workspace, create_workspace as initialize_workspace
 from core.submission_importer import ImportResult, SubmissionImporter
 from core.teacher_importer import TeacherImportResult, TeacherImporter
+from core.workspace_reporter import WorkspaceReportResult, WorkspaceReporter
 
 # Grade HashTable.
 def grade_hash_table():
@@ -525,6 +526,64 @@ def _select_template_member_numbered(candidates: list[str]) -> str:
     return candidates[selected_index]
 
 
+def _report_parser() -> argparse.ArgumentParser:
+    """Build the parser for the explicit reporting command.
+
+    :return: Parser describing the legacy milestone reporting workflow.
+    """
+    parser = argparse.ArgumentParser(
+        prog="Grade Checker report",
+        description="Generate reports for an initialized grading workspace.",
+    )
+    parser.add_argument(
+        "--workspace",
+        help="Initialized grading workspace directory; prompts if omitted",
+    )
+    return parser
+
+
+def report(arguments: Sequence[str]) -> int:
+    """Generate reports for submissions in a grading workspace.
+
+    :param arguments: Arguments following ``report``.
+    :return: Zero after reporting completes.
+    """
+    args = _report_parser().parse_args(list(arguments))
+    workspace = (
+        _clean_entered_value(args.workspace)
+        if args.workspace
+        else _select_workspace_interactively()
+    )
+    result = WorkspaceReporter(workspace).report()
+    _print_workspace_report_result(result)
+    return 0
+
+
+def _print_workspace_report_result(result: WorkspaceReportResult) -> None:
+    """Print the locations of reports generated for a workspace.
+
+    :param result: Workspace report result to summarize.
+    """
+    print(f"Workspace reports generated: {len(result.reports)}")
+    for report_path in result.reports:
+        print(f"  Report: {report_path}")
+    print(f"Summary report: {result.summary}")
+
+
+def _run_report(milestone: str, cfg: config.Config) -> None:
+    """Run the existing repository reporting workflow.
+
+    :param milestone: Base milestone name used by the reporter.
+    :param cfg: Loaded milestone configuration consumed by the reporter.
+    """
+    from core.reporter2 import Reporter2
+
+    print("main: Entered Reporter.")
+    reporter = Reporter2(milestone, cfg)
+    reporter._report()
+    reporter.report()
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the grading CLI while preserving the legacy milestone commands.
 
@@ -542,6 +601,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "import-teacher-zip", "import-teacher"
     }:
         return import_teacher_zip(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "report":
+        return report(command_arguments[1:])
 
     parser = argparse.ArgumentParser(
             prog = "Grade Checker"
@@ -611,14 +672,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         # print(out)
 
     if args.report:
-        from core.reporter2 import Reporter2
-
-        # BUG: Reporter2 currently calls Build and Grader with signatures that
-        # do not match their active class definitions, so reporting cannot run.
-        print("main: Entered Reporter.")
-        reporter = Reporter2(milestone, cfg)
-        reporter._report()
-        reporter.report()
+        # Compatibility path for existing scripts. New invocations should use
+        # `python3 main.py report <milestone>` instead.
+        _run_report(milestone, cfg)
         # xxx we always build. keep track of what's already built to not build
         # again.
 

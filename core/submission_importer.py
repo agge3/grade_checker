@@ -217,6 +217,7 @@ class SubmissionImporter:
             "source_members": members,
             "recovered_from_archive": recovered,
             "files": copied,
+            "student_files": copied,
             "warnings": warnings,
         }
         with (workspace / "submission_metadata.json").open("w", encoding="utf-8") as file:

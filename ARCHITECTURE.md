@@ -56,12 +56,26 @@ workspace, then uses `SubmissionImporter` to place the raw
 student-canvas-submissions under `raw/` and
 normalized submissions under `submissions/`.
 
+For each imported submission, the importer also creates an isolated
+`build-workspaces/{identifier}/` directory. It copies the imported teacher
+template there first, then overlays the student files so matching template
+files are replaced by the student's version. Submission metadata records both
+file sources and any replacements.
+
 The `import-teacher-zip` command requires an initialized workspace and the
 exact member name of the nested student-template ZIP. `TeacherImporter` copies
 the outer archive to `raw/`, extracts non-template artifacts under
 `references/teacher/`, extracts the template under `references/template/`, and
 records provenance in `references/teacher_metadata.json`. Unsafe archive paths
 are rejected and `.grader-ignore` template files are skipped.
+
+Reporting is exposed through the explicit `report` command. With no workspace
+argument it offers initialized workspaces through a keyboard-navigable
+selection prompt. `WorkspaceReporter` prepares each submission's build
+workspace at report time, overlays student files on the teacher template, and
+writes per-submission reports plus a workspace summary under `reports/`. The
+legacy `<milestone> --report` flag remains a compatibility path for repository
+reporting and does not use the workspace workflow.
 
 `load_config()` validates the JSON and returns a `Config` object. `Config`
 implements the mapping interface, so existing consumers can use expressions

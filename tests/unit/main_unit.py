@@ -68,6 +68,48 @@ class TeacherImportTests(unittest.TestCase):
         self.assertEqual(main.main(["import-teacher-zip"]), 0)
         import_teacher_zip.assert_called_once_with([])
 
+    @patch("main.report", return_value=0)
+    def test_main_dispatches_report_command(self, report) -> None:
+        """Ensure the explicit report command bypasses legacy flag parsing."""
+        self.assertEqual(main.main(["report", "milestone2-hugh"]), 0)
+        report.assert_called_once_with(["milestone2-hugh"])
+
+
+class WorkspaceReportTests(unittest.TestCase):
+    """Verify reporting prepares isolated teacher-template build workspaces."""
+
+    def test_report_overlays_teacher_template(self) -> None:
+        """Ensure reporting creates build inputs without changing student import."""
+        from core.submission_importer import SubmissionImporter
+        from core.workspace_reporter import WorkspaceReporter
+        from zipfile import ZipFile
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            (workspace / "workspace.json").write_text("{}", encoding="utf-8")
+            template_root = workspace / "references/template"
+            template_root.mkdir(parents=True)
+            (template_root / "CMakeLists.txt").write_text("template", encoding="utf-8")
+            (template_root / "support.hpp").write_text("support", encoding="utf-8")
+            submissions_zip = root / "submissions.zip"
+            with ZipFile(submissions_zip, "w") as archive:
+                archive.writestr("student.cpp", "student",)
+
+            result = SubmissionImporter(
+                submissions_zip, workspace, required_filename="student.cpp"
+            ).import_submissions()
+            self.assertFalse(
+                (workspace / "build-workspaces" / result.submissions[0].identifier).exists()
+            )
+            report_result = WorkspaceReporter(workspace).report()
+            build_workspace = workspace / "build-workspaces" / result.submissions[0].identifier
+            self.assertEqual((build_workspace / "CMakeLists.txt").read_text(), "template")
+            self.assertEqual((build_workspace / "support.hpp").read_text(), "support")
+            self.assertEqual((build_workspace / "student.cpp").read_text(), "student")
+            self.assertEqual(len(report_result.reports), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -106,6 +106,11 @@ submission workspace. The required file and allowed optional files are copied
 there; other files are retained in the source metadata and reported as
 warnings.
 
+When reporting runs, each submission receives an isolated directory under
+`build-workspaces/`. The teacher template is copied there first and the
+student files are overlaid afterward. Submission metadata records the teacher
+files, student files, and any template files replaced by the student.
+
 ### Import teacher materials
 
 Import the teacher ZIP after creating a workspace. The command interactively
@@ -125,6 +130,41 @@ The command preserves the teacher archive under `raw/`, extracts all other
 teacher files under `references/teacher/`, extracts the selected template under
 `references/template/`, and writes `references/teacher_metadata.json`. Template
 files ending in `.grader-ignore` are excluded.
+
+### Reporting
+
+Run the workspace reporter interactively:
+
+```bash
+python3 main.py report
+```
+
+It selects an initialized workspace, prepares each submission's build
+workspace at report time, and writes per-submission reports plus
+`reports/summary.txt`. For scripted runs, provide the workspace directly:
+
+```bash
+python3 main.py report --workspace grading-workspaces/milestone2
+```
+
+Use the explicit reporting command for new invocations. Without a milestone,
+it presents the available milestone configurations as a keyboard-navigable
+selection prompt:
+
+```bash
+python3 main.py report
+```
+
+For scripted runs, provide the milestone directly:
+
+```bash
+python3 main.py report milestone2-hugh
+```
+
+The older `python3 main.py milestone2-hugh --report` form remains supported for
+existing scripts and behaves the same way. The explicit command is the intended
+place to add workspace-native reporting as that workflow replaces the legacy
+repository reporter.
 
 ### To run all tests:
 ```bash
