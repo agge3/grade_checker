@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-from typing import TypedDict
+from typing import Callable, TypedDict
 
 
 class CriterionResult(TypedDict):
@@ -72,16 +72,42 @@ class WorkspaceReporter:
         reports: list[Path] = []
         submissions_root = self.workspace / "submissions"
         if submissions_root.is_dir():
-            for submission_root in sorted(path for path in submissions_root.iterdir() if path.is_dir()):
+            submission_roots = sorted(
+                path for path in submissions_root.iterdir() if path.is_dir()
+            )
+            total = len(submission_roots)
+            for index, submission_root in enumerate(submission_roots, start=1):
                 metadata_path = submission_root / "submission_metadata.json"
                 if not metadata_path.is_file():
                     continue
                 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-                outcome = self._process_submission(submission_root, metadata, run_time)
+                def update_status(status: str) -> None:
+                    """Show the active phase for the current submission.
+
+                    :param status: Short phase description displayed in the
+                        progress line.
+                    """
+                    print(
+                        f"Reporting {index}/{total} {submission_root.name}: {status}",
+                        end="\r",
+                        flush=True,
+                    )
+
+                update_status("preparing")
+                outcome = self._process_submission(
+                    submission_root, metadata, run_time, update_status
+                )
                 report_path = reports_root / submission_root.name / "report.txt"
                 report_path.parent.mkdir(parents=True, exist_ok=True)
                 self._write_report(report_path, outcome)
                 reports.append(report_path)
+                print(
+                    f"Reporting {index}/{total} {submission_root.name}: "
+                    f"build={outcome['build_status']} "
+                    f"runtime={outcome['runtime_status']} "
+                    f"report={report_path}",
+                    flush=True,
+                )
 
         summary = reports_root / "summary.txt"
         summary.write_text(
@@ -98,24 +124,32 @@ class WorkspaceReporter:
         )
 
     def _process_submission(
-        self, submission_root: Path, metadata: dict[str, object], run_time: str
+        self,
+        submission_root: Path,
+        metadata: dict[str, object],
+        run_time: str,
+        update_status: Callable[[str], None],
     ) -> dict[str, object]:
         """Prepare and evaluate one submission without stopping the cohort.
 
         :param submission_root: Student-only normalized submission directory.
         :param metadata: Submission metadata loaded from disk.
         :param run_time: UTC timestamp shared by this reporting run.
+        :param update_status: Callback used to show the active reporting phase.
         :return: Report data including criteria, paths, and diagnostics.
         """
         report_root = self.workspace / "reports" / submission_root.name
         report_root.mkdir(parents=True, exist_ok=True)
+        update_status("preparing build workspace")
         build_root, teacher_files, replaced_files = self._prepare_build_workspace(
             submission_root, metadata
         )
         build_log = report_root / "build-output.log"
         runtime_log = report_root / "runtime-output.log"
+        update_status("building")
         build_status, build_output, executable = self._build(build_root)
         build_log.write_text(build_output, encoding="utf-8")
+        update_status("running")
         runtime_status, runtime_output = self._run(build_root, executable, build_status)
         runtime_log.write_text(runtime_output, encoding="utf-8")
         student_files = metadata.get("student_files", metadata.get("files", []))
@@ -162,10 +196,11 @@ class WorkspaceReporter:
             "criteria": criteria,
             "rule_configuration": self.rule_configuration,
         })
+        update_status("writing report")
         (submission_root / "submission_metadata.json").write_text(
             json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
         )
-        (report_root / "notes.md").touch()
+        self._initialize_notes(report_root / "notes.md")
         overrides = report_root / "overrides.json"
         if not overrides.exists():
             overrides.write_text("{}\n", encoding="utf-8")
@@ -173,10 +208,35 @@ class WorkspaceReporter:
             "metadata": metadata,
             "student_root": submission_root,
             "build_root": build_root,
+            "build_status": build_status,
+            "runtime_status": runtime_status,
             "build_log": build_log,
             "runtime_log": runtime_log,
             "criteria": criteria,
         }
+
+    @staticmethod
+    def _initialize_notes(notes_path: Path) -> None:
+        """Create a guided TA-notes file without overwriting existing notes.
+
+        :param notes_path: Destination for the per-submission TA notes.
+        """
+        if notes_path.exists():
+            return
+        notes_path.write_text(
+            "# TA Notes\n\n"
+            "Use this file for human review notes, explanations, and decisions "
+            "about this submission.\n\n"
+            "This is different from `report.txt`: the report is generated by "
+            "the application and records automated results, evidence, and logs. "
+            "Do not edit the report to record manual grading decisions.\n\n"
+            "Examples:\n\n"
+            "- Explain a manual interpretation of a rubric criterion.\n"
+            "- Record a student clarification or a manual repair.\n"
+            "- Note what should be rechecked after a resubmission.\n\n"
+            "For structured corrections to automated findings, use `overrides.json`.\n",
+            encoding="utf-8",
+        )
 
     def _prepare_build_workspace(
         self, submission_root: Path, metadata: dict[str, object]

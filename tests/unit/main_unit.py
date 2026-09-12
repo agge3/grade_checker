@@ -109,6 +109,9 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertEqual((build_workspace / "support.hpp").read_text(), "support")
             self.assertEqual((build_workspace / "student.cpp").read_text(), "student")
             self.assertEqual(len(report_result.reports), 1)
+            notes = workspace / "reports" / result.submissions[0].identifier / "notes.md"
+            notes_text = notes.read_text(encoding="utf-8")
+            self.assertIn("different from `report.txt`", notes_text)
 
 
 if __name__ == "__main__":
