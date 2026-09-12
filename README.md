@@ -69,9 +69,8 @@ python -m tests.unit.shell_unit # Specific example
                    Windows to call bash scripts.
     * `file_processor.py` - Iterator for different file collections.
     * `grader.py` - Main driver for Grade Checker; handles "grading".
-    * `reporter.py` - Reporting information for Grade Checker.
-    * `scorer.py` - Scores the grade report, with justification snippets when
-                    scoring unfavourably to the student.
+    * `reporter2.py` - Aggregates build and grading results and writes reports.
+    * `new_fetch.py` - Incomplete alternative fetcher retained for experiments.
   * `tools`
     * `util.py` - Global utility functions.
   * `scripts` - Bash scripts for things that can be done easier with UNIX shell.
@@ -86,7 +85,12 @@ python -m tests.unit.shell_unit # Specific example
                       different file naming conventions.
   * `milestones` - JSON configuration files Grade Checker parses in for each
                    milestone's configuration.
-    * `_milestoneX` - Each milestone's configuration file.
+  * `_milestoneX` - Each milestone's configuration file.
+
+## Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the component diagram, command flow,
+configuration model, file layout, and current implementation boundaries.
 
 ## TODO
  * m3 onwards has a master _milestoneX.json schema change to allow for multiple
