@@ -12,6 +12,7 @@ from tools import util
 
 import argparse
 import re
+import shlex
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -184,6 +185,35 @@ def _print_import_result(result: ImportResult) -> None:
             print(f"warning: {warning}")
 
 
+def _print_import_command(
+    workspace: str,
+    student_canvas_submissions: str,
+    required_file: str,
+    optional_files: list[str],
+) -> None:
+    """Print a shell command equivalent to the completed import prompts.
+
+    :param workspace: Selected or entered workspace directory.
+    :param student_canvas_submissions: Student-canvas-submissions ZIP path.
+    :param required_file: Required student filename.
+    :param optional_files: Optional filenames accepted during import.
+    """
+    command = [
+        "python3",
+        "main.py",
+        "import-student-canvas-submissions",
+        "--workspace",
+        workspace,
+        "--student-canvas-submissions",
+        student_canvas_submissions,
+        "--required-file",
+        required_file,
+    ]
+    for optional_file in optional_files:
+        command.extend(("--optional-file", optional_file))
+    print(f"Equivalent command: {shlex.join(command)}")
+
+
 def _existing_workspaces() -> list[Path]:
     """Find initialized workspaces in the default workspace collection.
 
@@ -340,6 +370,12 @@ def import_submissions(arguments: Sequence[str]) -> int:
         ] or ["README.md"]
     if not workspace_value or not submissions_value or not required_file:
         raise ValueError("Workspace, student-canvas-submissions, and required filename are required.")
+    _print_import_command(
+        workspace_value,
+        submissions_value,
+        required_file,
+        optional_files,
+    )
     workspace_root = Path(workspace_value).expanduser()
     workspace_config = workspace_root / "workspace.json"
     if not workspace_config.is_file():

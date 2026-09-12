@@ -76,6 +76,9 @@ The command prompts for the initialized workspace, the
 student-canvas-submissions ZIP, the required student filename, and optional
 files. `README.md` is the default optional file.
 
+After the prompts are complete, the CLI prints an equivalent shell command so
+the same import can be rerun quickly without interactive prompts.
+
 When run in a terminal, use the Up/Down arrow keys to choose an existing
 initialized workspace under `grading-workspaces/`, or select the custom-path
 option to enter any workspace directory manually. Non-interactive terminals
