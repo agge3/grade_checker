@@ -3,6 +3,10 @@
 The application is organized as a command-line orchestration layer around
 repository fetching, source inspection, building, grading, and reporting.
 
+In the application, a milestone corresponds to the Canvas assignment being
+graded. “Milestone” is retained in configuration names, command-line
+arguments, and paths as an implementation term for an assignment.
+
 ## Main components
 
 ```text

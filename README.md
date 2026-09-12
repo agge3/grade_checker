@@ -92,6 +92,10 @@ python -m tests.unit.shell_unit # Specific example
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the component diagram, command flow,
 configuration model, file layout, and current implementation boundaries.
 
+See [docs/GRADING_WORKFLOW.md](docs/GRADING_WORKFLOW.md) for the grading
+context, TA workflow, application requirements, edge cases, and open design
+decisions.
+
 ## TODO
  * m3 onwards has a master _milestoneX.json schema change to allow for multiple
    files. refactor previous milestones to use new multiple file schema
