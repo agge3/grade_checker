@@ -97,6 +97,12 @@ The importer is also available from Python as
 file is unambiguous at the submitted ZIP root; extra and nested files are
 reported as warnings.
 
+When Canvas exports multiple files submitted by the same student, the importer
+groups files with the same Canvas-generated metadata prefix into one normalized
+submission workspace. The required file and allowed optional files are copied
+there; other files are retained in the source metadata and reported as
+warnings.
+
 ### To run all tests:
 ```bash
 python -m tests.<type_of_test>.run  # General

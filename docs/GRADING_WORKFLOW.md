@@ -75,6 +75,10 @@ Consequences for the grader:
 
 - Discover submissions from the student-canvas-submissions contents, including the usual
   `submissions` wrapper, while allowing for minor layout variation.
+- Group multiple Canvas-exported files with the same submission metadata into
+  one submission rather than treating each file as a separate submission.
+  The grouping key uses the shared first numeric metadata value; the second
+  numeric value is treated as file-specific.
 - Include the original Canvas submission filename prominently in the report.
 - Preserve original relative paths as submission labels and audit information,
   without treating filenames as verified student identities.
@@ -123,11 +127,12 @@ The student-supplied filename and extension are useful evidence, but the app
 still evaluates the extracted submission rather than identifying the student.
 
 For internal workspace naming, use the student's first name, last name, and
-the two Canvas-generated numeric values. Exclude the optional `[LATE]` marker
-and a trailing duplicate-attempt suffix such as `-2`. The full original
-filename remains available in metadata and reports. If removing those markers
-produces a name collision, the application must report the collision and use a
-deterministic disambiguation that does not discard either submission.
+the shared first Canvas-generated numeric value. Exclude the per-file second
+numeric value, the optional `[LATE]` marker, and a trailing duplicate-attempt
+suffix such as `-2`. The full original filename remains available in metadata
+and reports. If removing those markers produces a name collision, the
+application must report the collision and use a deterministic disambiguation
+that does not discard either submission.
 
 Canvas's bulk export provides only the most recent submission. The grader
 should not imply that it has access to earlier attempts, even when the filename
@@ -169,9 +174,10 @@ the original archive.
    import/setup workflow.
 4. The application validates and preserves the original inputs.
 5. The application discovers individual submissions and creates an isolated,
-   normalized workspace for each one. The submission's internal name is based
-   on the Canvas-generated filename metadata, excluding the optional `[LATE]`
-   marker and the optional duplicate-attempt suffix such as `-2`.
+   normalized workspace for each one. The submission's internal name uses the
+   shared first Canvas numeric value, excluding the per-file second numeric
+   value, the optional `[LATE]` marker, and the optional duplicate-attempt
+   suffix such as `-2`.
 6. The application applies the assignment configuration and instructor-provided
    files, then runs the enabled checks.
 7. The application builds and, where applicable, executes each submission with
