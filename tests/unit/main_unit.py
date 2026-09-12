@@ -109,6 +109,13 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertEqual((build_workspace / "support.hpp").read_text(), "support")
             self.assertEqual((build_workspace / "student.cpp").read_text(), "student")
             self.assertEqual(len(report_result.reports), 1)
+            report_text = report_result.reports[0].read_text(encoding="utf-8")
+            for section in (
+                "File Headers", "Methods", "GTest Check", "Output Check",
+            ):
+                self.assertIn(section, report_text)
+            self.assertNotIn("Raw Build Output", report_text)
+            self.assertNotIn("Runtime Output", report_text)
             notes = workspace / "reports" / result.submissions[0].identifier / "notes.md"
             notes_text = notes.read_text(encoding="utf-8")
             self.assertIn("different from `report.txt`", notes_text)

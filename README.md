@@ -149,8 +149,11 @@ python3 main.py report --workspace grading-workspaces/milestone2
 
 Each submission report directory includes a guided `notes.md` for TA-written
 observations. The generated `report.txt` contains automated findings and
-evidence; manual notes should go in `notes.md`, while structured corrections
-belong in `overrides.json`.
+evidence, including file-header and configured-method details, GTest/extra-credit
+configuration status, and output-check status. Full build and runtime output
+remain available in the linked log files.
+Manual notes should go in `notes.md`, while structured corrections belong in
+`overrides.json`.
 
 Use the explicit reporting command for new invocations. Without a milestone,
 it presents the available milestone configurations as a keyboard-navigable

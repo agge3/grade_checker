@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-from typing import Callable, TypedDict
+from typing import Callable, Mapping, TypedDict
 
 
 class CriterionResult(TypedDict):
@@ -152,6 +152,7 @@ class WorkspaceReporter:
         update_status("running")
         runtime_status, runtime_output = self._run(build_root, executable, build_status)
         runtime_log.write_text(runtime_output, encoding="utf-8")
+        legacy_details = self._collect_legacy_details(build_root)
         student_files = metadata.get("student_files", metadata.get("files", []))
         criteria: list[CriterionResult] = [
             {
@@ -213,7 +214,93 @@ class WorkspaceReporter:
             "build_log": build_log,
             "runtime_log": runtime_log,
             "criteria": criteria,
+            "legacy_details": legacy_details,
         }
+
+    def _collect_legacy_details(
+        self, build_root: Path
+    ) -> dict[str, object]:
+        """Collect the detailed sections from the legacy report style.
+
+        :param build_root: Prepared source tree for one submission.
+        :return: Serializable header, method, and check details.
+        """
+        configuration = self._load_rule_configuration()
+        source_files = sorted(
+            path for path in build_root.rglob("*")
+            if path.is_file()
+            and path.suffix.lower() in {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp"}
+            and "build" not in path.parts
+        )
+        headers: list[str] = []
+        for source_file in source_files:
+            source_lines = source_file.read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines()
+            first_nonempty = next((line.strip() for line in source_lines if line.strip()), "")
+            status = "FOUND" if first_nonempty.startswith(("//", "/*", "*")) else "MISSING"
+            headers.append(
+                f"{status} header comment: {source_file.relative_to(build_root)}"
+            )
+
+        methods: dict[str, list[str]] = {}
+        configured_methods = configuration.get("methods", {})
+        source_text = "\n".join(
+            path.read_text(encoding="utf-8", errors="replace") for path in source_files
+        )
+        if isinstance(configured_methods, Mapping):
+            for clazz, class_methods in configured_methods.items():
+                if not isinstance(clazz, str) or not isinstance(class_methods, Mapping):
+                    continue
+                results: list[str] = []
+                for method_name in class_methods:
+                    if not isinstance(method_name, str):
+                        continue
+                    qualified = f"{clazz}::{method_name}"
+                    status = "FOUND" if qualified in source_text else "MISSING"
+                    results.append(f"{status}: {qualified}")
+                methods[clazz] = results
+
+        extra_credit = configuration.get("extra_credit", {})
+        if isinstance(extra_credit, Mapping) and extra_credit.get("enabled"):
+            gtest_check = (
+                "Configured legacy check (not executed by workspace reporter): "
+                f"{extra_credit.get('args', [])}"
+            )
+        else:
+            gtest_check = "No extra-credit/GTest check configured."
+        options = configuration.get("options", {})
+        output_check = (
+            "Configured; inspect captured build output."
+            if isinstance(options, Mapping) and options.get("check_build")
+            else "No output-check rule configured."
+        )
+        return {
+            "headers": headers or ["No C/C++ source files found."],
+            "methods": methods or {"(no configured methods)": ["Needs manual review."]},
+            "gtest_check": gtest_check,
+            "output_check": output_check,
+        }
+
+    def _load_rule_configuration(self) -> dict[str, object]:
+        """Load the milestone configuration associated with this workspace.
+
+        :return: Configuration mapping, or an empty mapping when unavailable.
+        """
+        metadata = json.loads(
+            (self.workspace / "workspace.json").read_text(encoding="utf-8")
+        )
+        configuration_path = metadata.get("milestone_configuration")
+        if not isinstance(configuration_path, str) or not configuration_path:
+            return {}
+        path = Path(configuration_path).expanduser()
+        if not path.is_file():
+            candidate = self.workspace.parent / path
+            path = candidate if candidate.is_file() else path
+        if not path.is_file():
+            return {}
+        configuration = json.loads(path.read_text(encoding="utf-8"))
+        return configuration if isinstance(configuration, dict) else {}
 
     @staticmethod
     def _initialize_notes(notes_path: Path) -> None:
@@ -368,6 +455,9 @@ class WorkspaceReporter:
         metadata = outcome["metadata"]
         assert isinstance(metadata, dict)
         criteria = outcome["criteria"]
+        assert isinstance(criteria, list)
+        legacy_details = outcome["legacy_details"]
+        assert isinstance(legacy_details, dict)
         lines = [
             "Submission report", "=================",
             f"Submission identifier: {metadata.get('identifier', report_path.parent.name)}",
@@ -384,7 +474,17 @@ class WorkspaceReporter:
                 f"[{criterion['status']}] {criterion['id']} "
                 f"(automated={criterion['automated']}): {criterion['evidence']}"
             )
+        lines.extend(["", "File Headers", "------------"])
+        lines.extend(str(item) for item in legacy_details["headers"])
+        lines.extend(["", "Methods", "-------"])
+        methods = legacy_details["methods"]
+        assert isinstance(methods, dict)
+        for clazz, method_results in methods.items():
+            lines.append(f"{clazz}:")
+            lines.extend(f"  {result}" for result in method_results)
         lines.extend([
+            "", "GTest Check", "-----------", str(legacy_details["gtest_check"]),
+            "", "Output Check", "------------", str(legacy_details["output_check"]),
             "", f"Build log: {outcome['build_log']}",
             f"Runtime log: {outcome['runtime_log']}",
             f"TA notes: {report_path.parent / 'notes.md'}",

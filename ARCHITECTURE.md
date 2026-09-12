@@ -73,7 +73,11 @@ Reporting is exposed through the explicit `report` command. With no workspace
 argument it offers initialized workspaces through a keyboard-navigable
 selection prompt. `WorkspaceReporter` prepares each submission's build
 workspace at report time, overlays student files on the teacher template, and
-writes per-submission reports plus a workspace summary under `reports/`. The
+writes per-submission reports plus a workspace summary under `reports/`. Each
+submission report retains the legacy report sections (file headers, configured
+methods, GTest/extra-credit status, and output-check status) while linking to
+the separate build and runtime logs. It clearly marks checks that are not executed by the
+workspace workflow. The
 legacy `<milestone> --report` flag remains a compatibility path for repository
 reporting and does not use the workspace workflow.
 
