@@ -184,6 +184,97 @@ def _print_import_result(result: ImportResult) -> None:
             print(f"warning: {warning}")
 
 
+def _existing_workspaces() -> list[Path]:
+    """Find initialized workspaces in the default workspace collection.
+
+    :return: Existing directories containing a ``workspace.json`` file.
+    """
+    workspace_root = Path.cwd() / "grading-workspaces"
+    if not workspace_root.is_dir():
+        return []
+    return sorted(
+        path for path in workspace_root.iterdir()
+        if path.is_dir() and (path / "workspace.json").is_file()
+    )
+
+
+def _custom_workspace_path() -> str:
+    """Prompt for a workspace path supplied manually by the user.
+
+    :return: The entered workspace path with surrounding whitespace removed.
+    """
+    return input("Custom workspace directory: ").strip()
+
+
+def _select_workspace_numbered(options: list[Path | str]) -> str:
+    """Select a workspace using a numbered prompt.
+
+    :param options: Existing workspace paths followed by the custom-path option.
+    :return: Selected or manually entered workspace directory.
+    :raises ValueError: If the entered selection is not valid.
+    """
+    print("Select a workspace:")
+    for index, option in enumerate(options, start=1):
+        print(f"  {index}. {option}")
+    selection = input("Workspace number: ").strip()
+    try:
+        selected_index = int(selection) - 1
+    except ValueError as error:
+        raise ValueError("Workspace selection must be a number.") from error
+    if selected_index < 0 or selected_index >= len(options):
+        raise ValueError("Workspace selection is out of range.")
+    selected = options[selected_index]
+    return _custom_workspace_path() if isinstance(selected, str) else str(selected)
+
+
+def _select_workspace_interactively() -> str:
+    """Select an existing workspace with keyboard navigation or enter a path.
+
+    :return: Selected or manually entered workspace directory.
+    :raises EOFError: If interactive input ends before a selection is made.
+    """
+    choices = _existing_workspaces()
+    custom_label = "Enter a custom workspace path"
+    options = [*choices, custom_label]
+    if not options:
+        return _custom_workspace_path()
+
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        return _select_workspace_numbered(options)
+
+    try:
+        import termios
+        import tty
+    except ImportError:
+        return _select_workspace_numbered(options)
+
+    selected_index = 0
+    print("Select a workspace (↑/↓ to move, Enter to select):")
+    while True:
+        for index, option in enumerate(options):
+            marker = ">" if index == selected_index else " "
+            label = str(option) if isinstance(option, Path) else option
+            print(f"\r{marker} {label}\033[K")
+        print(f"\033[{len(options)}A", end="", flush=True)
+        file_descriptor = sys.stdin.fileno()
+        original_settings = termios.tcgetattr(file_descriptor)
+        try:
+            tty.setraw(file_descriptor)
+            key = sys.stdin.read(1)
+            if key == "\x1b":
+                sequence = sys.stdin.read(2)
+                if sequence == "[A":
+                    selected_index = (selected_index - 1) % len(options)
+                elif sequence == "[B":
+                    selected_index = (selected_index + 1) % len(options)
+            elif key in ("\r", "\n"):
+                print()
+                selected = options[selected_index]
+                return _custom_workspace_path() if selected == custom_label else str(selected)
+        finally:
+            termios.tcsetattr(file_descriptor, termios.TCSADRAIN, original_settings)
+
+
 def import_submissions(arguments: Sequence[str]) -> int:
     """Import student-canvas-submissions into an initialized grading workspace.
 
@@ -196,7 +287,7 @@ def import_submissions(arguments: Sequence[str]) -> int:
     """
     parser = _import_submissions_parser()
     args = parser.parse_args(list(arguments))
-    workspace_value = args.workspace or input("Initialized workspace directory: ").strip()
+    workspace_value = args.workspace or _select_workspace_interactively()
     submissions_value = args.student_canvas_submissions or input(
         "Student-canvas-submissions ZIP: "
     ).strip()
