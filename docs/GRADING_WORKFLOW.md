@@ -25,12 +25,12 @@ instructor's spreadsheet.
 Students receive a project template containing some instructor-provided code.
 They are expected to submit the files they created or changed through Canvas.
 Because submissions may be incomplete, incorrectly structured, or otherwise
-unreliable, the application must treat every student archive as untrusted
+unreliable, the application must treat every student-canvas-submissions item as untrusted
 input and report problems clearly.
 
 The TA has the following teacher-only materials:
 
-- A ZIP archive containing all student submissions exported from Canvas.
+- A student-canvas-submissions ZIP exported from Canvas.
 - A teacher ZIP archive containing the grading spreadsheet, solution source
   files, an expected program-output log, and a ZIP of the student project
   template.
@@ -49,7 +49,7 @@ is informational evidence for the TA.
 ## Canvas submission-export assumptions
 
 Canvas's instructor **Download Submissions** workflow produces one ZIP for an
-assignment. The extracted archive contains a `submissions` folder containing
+assignment. The extracted student-canvas-submissions ZIP contains a `submissions` folder containing
 the downloaded work. For individual assignments, Canvas adds the student's
 name to downloaded filenames in last-name-first form; for group assignments,
 it uses the group name. Anonymous grading removes student names from those
@@ -73,7 +73,7 @@ within text entries.
 
 Consequences for the grader:
 
-- Discover submissions from the archive contents, including the usual
+- Discover submissions from the student-canvas-submissions contents, including the usual
   `submissions` wrapper, while allowing for minor layout variation.
 - Include the original Canvas submission filename prominently in the report.
 - Preserve original relative paths as submission labels and audit information,
@@ -102,9 +102,9 @@ detect likely mismatches and notify the TA that the configuration file needs
 review. The notification should include specific details, such as the
 configured filename, files found in the teacher ZIP, and the affected
 submissions. Automatic configuration changes are out of scope for this
-temporary resolution. The exact Canvas archive structure is not yet considered
+temporary resolution. The exact student-canvas-submissions ZIP structure is not yet considered
 stable, so the importer should be tolerant of wrapper folders and should
-preserve the raw archive for inspection.
+preserve the raw student-canvas-submissions for inspection.
 
 Based on current observations, Canvas modifies the downloaded filename by
 prefixing metadata before the filename supplied by the student. The observed
@@ -164,7 +164,7 @@ the original archive.
 2. The application interactively prompts for the workspace directory and
    optional milestone configuration, then creates the empty workspace layout
    and writes its workspace configuration.
-3. The TA later supplies the student-submission ZIP, teacher ZIP, template,
+3. The TA later supplies the student-canvas-submissions ZIP, teacher ZIP, template,
    reference solution, expected-output log, and grading spreadsheet through the
    import/setup workflow.
 4. The application validates and preserves the original inputs.

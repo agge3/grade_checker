@@ -1,4 +1,4 @@
-"""Import and normalize Canvas submission archives."""
+"""Import and normalize student-canvas-submissions."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ class ImportResult:
 class SubmissionImporter:
     """Convert a Canvas bulk ZIP into isolated, normalized workspaces.
 
-    :param archive_path: Canvas bulk-submission ZIP to import.
+    :param archive_path: Student-canvas-submissions ZIP to import.
     :param output_root: Directory receiving the raw archive and workspaces.
     :param required_filename: Student file expected by the milestone.
     :param optional_filenames: Files that may accompany the required file.
@@ -62,7 +62,7 @@ class SubmissionImporter:
         :raises ValueError: If the input is not a valid ZIP archive.
         """
         if not self.archive_path.is_file():
-            raise FileNotFoundError(f"Submission archive '{self.archive_path}' was not found.")
+            raise FileNotFoundError(f"Student-canvas-submissions '{self.archive_path}' was not found.")
         self.output_root.mkdir(parents=True, exist_ok=True)
         raw_archive = self.output_root / "raw" / self.archive_path.name
         raw_archive.parent.mkdir(parents=True, exist_ok=True)
@@ -84,10 +84,10 @@ class SubmissionImporter:
                         for warning in submission.warnings
                     )
                 if not result.submissions:
-                    result.warnings.append("The submission archive contains no files.")
+                    result.warnings.append("The student-canvas-submissions contains no files.")
                 return result
         except BadZipFile as error:
-            raise ValueError(f"Submission archive '{self.archive_path}' is not a valid ZIP file.") from error
+            raise ValueError(f"Student-canvas-submissions '{self.archive_path}' is not a valid ZIP file.") from error
 
     def _safe_entries(self, archive: ZipFile) -> list[str]:
         """Return non-directory archive entries and reject unsafe paths.
@@ -102,7 +102,7 @@ class SubmissionImporter:
             if info.is_dir():
                 continue
             if path.is_absolute() or ".." in path.parts:
-                raise ValueError(f"Unsafe path in submission archive: '{info.filename}'.")
+                raise ValueError(f"Unsafe path in student-canvas-submissions: '{info.filename}'.")
             entries.append(info.filename)
         return entries
 
@@ -268,9 +268,9 @@ def import_submissions(
     required_filename: str | None = None,
     optional_filenames: Iterable[str] = ("README.md",),
 ) -> ImportResult:
-    """Import a Canvas archive using a one-call convenience interface.
+    """Import student-canvas-submissions using a one-call convenience interface.
 
-    :param archive_path: Canvas bulk-submission ZIP to import.
+    :param archive_path: Student-canvas-submissions ZIP to import.
     :param output_root: Directory receiving the imported workspaces.
     :param required_filename: Student file expected by the milestone.
     :param optional_filenames: Files allowed alongside the required file.

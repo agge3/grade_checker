@@ -20,7 +20,7 @@ main.py
   +-- core.workspace ----------- creates empty grading workspace layouts and
   |                                records workspace configuration
   |
-  +-- core.submission_importer -- preserves Canvas archives and normalizes
+  +-- core.submission_importer -- preserves student-canvas-submissions and normalizes
                                    submissions into isolated workspaces
   |
   +-- core.build.Build --------- copies support files, configures CMake,
@@ -46,8 +46,13 @@ The interactive `create-workspace` command initializes an empty grading
 workspace below the application root's `grading-workspaces/` directory. It
 creates `raw/`, `submissions/`, `build-workspaces/`, `reports/`, and
 `references/`, then records the selected milestone and directory mapping in
-`workspace.json`. Submission archive import and normalization are separate
+`workspace.json`. Student-canvas-submissions import and normalization are separate
 operations handled later by `core.submission_importer`.
+
+The `import-student-canvas-submissions` command requires an initialized
+workspace, then uses `SubmissionImporter` to place the raw
+student-canvas-submissions under `raw/` and
+normalized submissions under `submissions/`.
 
 `load_config()` validates the JSON and returns a `Config` object. `Config`
 implements the mapping interface, so existing consumers can use expressions
@@ -78,7 +83,7 @@ The supported flags are independent and may be combined:
 
 `core.workspace.create_workspace()` owns workspace initialization and writes
 the workspace-level `workspace.json` metadata. `SubmissionImporter` is a
-separate later-stage component: it preserves an input archive under `raw/`,
+separate later-stage component: it preserves student-canvas-submissions under `raw/`,
 creates normalized directories under `submissions/`, and records provenance
 and warnings in `submission_metadata.json`.
 

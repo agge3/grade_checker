@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Sequence
 
 from core.workspace import Workspace, create_workspace as initialize_workspace
+from core.submission_importer import ImportResult, SubmissionImporter
 
 # Grade HashTable.
 def grade_hash_table():
@@ -140,6 +141,90 @@ def create_workspace(arguments: Sequence[str]) -> int:
     return 0
 
 
+def _import_submissions_parser() -> argparse.ArgumentParser:
+    """Build the parser for importing submissions into a workspace.
+
+    :return: Parser describing the submission-import options.
+    """
+    parser = argparse.ArgumentParser(
+        prog="Grade Checker import-student-canvas-submissions",
+        description="Import student-canvas-submissions into a grading workspace.",
+    )
+    parser.add_argument("--workspace", help="Initialized grading workspace directory")
+    parser.add_argument(
+        "--student-canvas-submissions", "--archive",
+        dest="student_canvas_submissions",
+        help="Student-canvas-submissions ZIP exported from Canvas",
+    )
+    parser.add_argument("--required-file", help="Required student filename, such as milestone1.cpp")
+    parser.add_argument(
+        "--optional-file",
+        action="append",
+        dest="optional_files",
+        default=None,
+        help="Optional file allowed in submitted ZIPs; may be repeated",
+    )
+    return parser
+
+
+def _print_import_result(result: ImportResult) -> None:
+    """Print a human-readable summary of an import operation.
+
+    :param result: Import result to summarize.
+    """
+    print(f"Imported submissions: {len(result.submissions)}")
+    if result.raw_archive:
+        print(f"Student-canvas-submissions: {result.raw_archive}")
+    for submission in result.submissions:
+        print(f"  {submission.identifier}: {submission.workspace}")
+        for warning in submission.warnings:
+            print(f"    warning: {warning}")
+    for warning in result.warnings:
+        if not any(warning.endswith(item) for submission in result.submissions for item in submission.warnings):
+            print(f"warning: {warning}")
+
+
+def import_submissions(arguments: Sequence[str]) -> int:
+    """Import student-canvas-submissions into an initialized grading workspace.
+
+        :param arguments: Arguments following
+            ``import-student-canvas-submissions``.
+    :return: Zero after a successful import.
+    :raises FileNotFoundError: If the workspace or student-canvas-submissions
+        file does not exist.
+    :raises ValueError: If student-canvas-submissions is invalid or unsafe.
+    """
+    parser = _import_submissions_parser()
+    args = parser.parse_args(list(arguments))
+    workspace_value = args.workspace or input("Initialized workspace directory: ").strip()
+    submissions_value = args.student_canvas_submissions or input(
+        "Student-canvas-submissions ZIP: "
+    ).strip()
+    required_file = args.required_file or input("Required student filename: ").strip()
+    optional_files = args.optional_files
+    if optional_files is None:
+        optional_value = input("Optional files [README.md]: ").strip()
+        optional_files = [
+            item.strip() for item in optional_value.split(",") if item.strip()
+        ] or ["README.md"]
+    if not workspace_value or not submissions_value or not required_file:
+        raise ValueError("Workspace, student-canvas-submissions, and required filename are required.")
+    workspace_root = Path(workspace_value).expanduser()
+    workspace_config = workspace_root / "workspace.json"
+    if not workspace_config.is_file():
+        raise FileNotFoundError(
+            f"Workspace '{workspace_root}' is not initialized; run create-workspace first."
+        )
+    result = SubmissionImporter(
+        submissions_value,
+        workspace_root,
+        required_filename=required_file,
+        optional_filenames=optional_files,
+    ).import_submissions()
+    _print_import_result(result)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the grading CLI while preserving the legacy milestone commands.
 
@@ -149,6 +234,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     command_arguments = list(sys.argv[1:] if argv is None else argv)
     if command_arguments and command_arguments[0] == "create-workspace":
         return create_workspace(command_arguments[1:])
+    if command_arguments and command_arguments[0] in {
+        "import-student-canvas-submissions", "import-submissions"
+    }:
+        return import_submissions(command_arguments[1:])
 
     parser = argparse.ArgumentParser(
             prog = "Grade Checker"

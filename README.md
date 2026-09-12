@@ -45,6 +45,50 @@ mkdir -p repos/milestone${num}/reports
 python main.py milestone${num}-${prof} -r
 ```
 
+### Create a grading workspace
+
+Initialize an empty grading workspace interactively:
+
+```bash
+python3 main.py create-workspace
+```
+
+For scripted use, provide the values as options:
+
+```bash
+python3 main.py create-workspace \
+  --output grading-workspaces/milestone2 \
+  --milestone milestone2-hugh
+```
+
+### Import student-canvas-submissions
+
+After creating a workspace, import student-canvas-submissions interactively:
+
+```bash
+python3 main.py import-student-canvas-submissions
+```
+
+The command prompts for the initialized workspace, the
+student-canvas-submissions ZIP, the required student filename, and optional
+files. `README.md` is the default optional file.
+
+For scripted use:
+
+```bash
+python3 main.py import-student-canvas-submissions \
+  --workspace grading-workspaces/milestone2 \
+  --student-canvas-submissions student-canvas-submissions.zip \
+  --required-file milestone2.cpp
+```
+
+The importer is also available from Python as
+`core.submission_importer.SubmissionImporter`. It preserves the input ZIP under
+`raw/`, creates normalized directories under `submissions/`, and writes
+`submission_metadata.json`. Submitted ZIPs are recovered only when the required
+file is unambiguous at the submitted ZIP root; extra and nested files are
+reported as warnings.
+
 ### To run all tests:
 ```bash
 python -m tests.<type_of_test>.run  # General
@@ -95,60 +139,6 @@ configuration model, file layout, and current implementation boundaries.
 See [docs/GRADING_WORKFLOW.md](docs/GRADING_WORKFLOW.md) for the grading
 context, TA workflow, application requirements, edge cases, and open design
 decisions.
-
-The submission archive importer is available as
-`core.submission_importer.SubmissionImporter`. Give it the Canvas ZIP, an
-output directory, and the milestone's required filename. It preserves the raw
-ZIP and creates normalized workspaces under `submissions/`, with provenance in
-`submission_metadata.json`.
-
-### Create a grading workspace
-
-Initialize an empty grading workspace interactively:
-
-```bash
-python3 main.py create-workspace
-```
-
-The command prompts for a workspace name and optional milestone
-configuration. Workspaces are created under the application root's
-`grading-workspaces/` directory. `--output` and `--milestone` may be supplied
-to skip those prompts. Each workspace contains `raw/`, `submissions/`,
-`build-workspaces/`, `reports/`, and `references/`, plus `workspace.json`.
-Submission archive importing is a separate future workflow.
-
-For example:
-
-```text
-$ python3 main.py create-workspace
-Workspace name [grading-workspace]: milestone2
-Milestone configuration (optional): milestone2-hugh
-Created grading workspace: .../grading-workspaces/milestone2
-Workspace configuration: .../grading-workspaces/milestone2/workspace.json
-Milestone: milestone2-hugh
-```
-
-This creates the following workspace below the repository root:
-
-```text
-grading-workspaces/
-└── milestone2/
-    ├── build-workspaces/
-    ├── raw/
-    ├── references/
-    ├── reports/
-    ├── submissions/
-    └── workspace.json
-```
-
-The milestone prompt may be left blank when the workspace is not yet tied to a
-specific grading configuration. To provide values without prompts:
-
-```bash
-python3 main.py create-workspace \
-  --output grading-workspaces/milestone2 \
-  --milestone milestone2-hugh
-```
 
 ## TODO
  * m3 onwards has a master _milestoneX.json schema change to allow for multiple
