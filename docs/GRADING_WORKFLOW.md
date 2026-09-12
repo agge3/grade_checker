@@ -270,7 +270,13 @@ prevent independent source or documentation checks from running.
 
 Submission timestamps are outside the current file-only workflow. File
 modification times inside an archive must not be treated as evidence of when a
-student submitted.
+student submitted. The original report filename is sufficient context for the
+instructor's separate late-submission handling. The application should
+preserve that filename, may display an observed `[LATE]`
+marker as information, and should not calculate late penalties or infer
+earlier attempts. The TA treats every submission as on time when evaluating
+the assignment criteria. The instructor, not the TA or the application, is
+responsible for determining any late-submission score adjustment.
 
 ### Reports and manual grading
 
@@ -297,7 +303,8 @@ information and evidence for each criterion, and the TA decides the points
 manually in the grading spreadsheet. Report criterion names and stable
 identifiers should align with the spreadsheet so the TA can transfer findings
 efficiently. The spreadsheet should remain unchanged unless the TA
-intentionally updates it.
+intentionally updates it. These criterion points exclude any late-submission
+adjustment, which is handled separately by the instructor.
 
 The human-readable report may summarize or link to these logs, but build output
 and runtime output must not be merged into one log file. Each submission's log
@@ -397,9 +404,7 @@ production-ready:
 5. What kinds of per-submission finding corrections or annotations are allowed,
    and how must they be documented? The application does not assign points;
    the TA records points manually in the spreadsheet.
-6. If late submissions, resubmissions, or multiple Canvas exports matter,
-   what separate TA process will supply that information to the spreadsheet?
-7. How are rubric changes versioned after grading has begun?
+6. How are rubric changes versioned after grading has begun?
 
 ## Application requirements checklist for future changes
 
@@ -413,6 +418,8 @@ the following application and grading requirements:
   identities.
 - The application reports findings and evidence but does not calculate points
   or assign grades.
+- The TA evaluates every submission as on time; the instructor handles any
+  late-submission score adjustment separately.
 - Reports reproduce the original Canvas submission filename so the TA can
   locate the artifact in the original export.
 - Original inputs remain preserved and traceable.
