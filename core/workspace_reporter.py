@@ -1,11 +1,24 @@
-"""Generate reports for normalized grading workspaces."""
+"""Generate auditable reports for normalized grading workspaces."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 import shutil
+import subprocess
+from typing import TypedDict
+
+
+class CriterionResult(TypedDict):
+    """Describe the result and evidence for one report criterion."""
+
+    id: str
+    status: str
+    evidence: str
+    automated: bool
 
 
 @dataclass(frozen=True)
@@ -15,56 +28,155 @@ class WorkspaceReportResult:
     workspace: Path
     reports: tuple[Path, ...]
     summary: Path
+    similarity_report: Path
 
 
 class WorkspaceReporter:
-    """Prepare build inputs and write reports for imported submissions.
+    """Build and report on every normalized submission in a workspace.
 
     :param workspace: Initialized grading workspace containing submissions and
         an optional imported teacher template.
+    :param runtime_timeout: Maximum seconds allowed for one student program.
     """
 
-    def __init__(self, workspace: str | Path) -> None:
+    def __init__(self, workspace: str | Path, runtime_timeout: int = 30) -> None:
         self.workspace = Path(workspace).expanduser()
+        self.runtime_timeout = runtime_timeout
+        self.rule_configuration = "workspace metadata"
 
     def report(self) -> WorkspaceReportResult:
-        """Create build workspaces and one report for each submission.
+        """Prepare, build, run, and report every normalized submission.
 
-        :return: Paths to per-submission reports and the summary report.
+        :return: Paths to per-submission reports, the summary, and similarity
+            report.
         :raises FileNotFoundError: If the workspace is not initialized.
+        :raises ValueError: If the runtime timeout is not positive.
         """
+        if self.runtime_timeout <= 0:
+            raise ValueError("Runtime timeout must be positive.")
         if not (self.workspace / "workspace.json").is_file():
             raise FileNotFoundError(
                 f"Workspace '{self.workspace}' is not initialized; run create-workspace first."
             )
-        submissions_root = self.workspace / "submissions"
+        workspace_metadata = json.loads(
+            (self.workspace / "workspace.json").read_text(encoding="utf-8")
+        )
+        self.rule_configuration = str(
+            workspace_metadata.get("milestone_configuration")
+            or workspace_metadata.get("milestone")
+            or "workspace metadata"
+        )
         reports_root = self.workspace / "reports"
         reports_root.mkdir(parents=True, exist_ok=True)
+        run_time = datetime.now(timezone.utc).isoformat()
         reports: list[Path] = []
-        for submission_root in sorted(path for path in submissions_root.iterdir() if path.is_dir()):
-            metadata_path = submission_root / "submission_metadata.json"
-            if not metadata_path.is_file():
-                continue
-            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            build_root, teacher_files, replaced_files = self._prepare_build_workspace(
-                submission_root, metadata
-            )
-            report_path = reports_root / submission_root.name / "report.txt"
-            report_path.parent.mkdir(parents=True, exist_ok=True)
-            self._write_report(
-                report_path, metadata, build_root, teacher_files, replaced_files
-            )
-            reports.append(report_path)
+        submissions_root = self.workspace / "submissions"
+        if submissions_root.is_dir():
+            for submission_root in sorted(path for path in submissions_root.iterdir() if path.is_dir()):
+                metadata_path = submission_root / "submission_metadata.json"
+                if not metadata_path.is_file():
+                    continue
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                outcome = self._process_submission(submission_root, metadata, run_time)
+                report_path = reports_root / submission_root.name / "report.txt"
+                report_path.parent.mkdir(parents=True, exist_ok=True)
+                self._write_report(report_path, outcome)
+                reports.append(report_path)
 
         summary = reports_root / "summary.txt"
         summary.write_text(
             f"Workspace: {self.workspace}\n"
+            f"Run time (UTC): {run_time}\n"
             f"Submissions reported: {len(reports)}\n"
             + "\n".join(f"- {path}" for path in reports)
             + "\n",
             encoding="utf-8",
         )
-        return WorkspaceReportResult(self.workspace, tuple(reports), summary)
+        similarity_report = self._write_similarity_report(reports_root, run_time)
+        return WorkspaceReportResult(
+            self.workspace, tuple(reports), summary, similarity_report
+        )
+
+    def _process_submission(
+        self, submission_root: Path, metadata: dict[str, object], run_time: str
+    ) -> dict[str, object]:
+        """Prepare and evaluate one submission without stopping the cohort.
+
+        :param submission_root: Student-only normalized submission directory.
+        :param metadata: Submission metadata loaded from disk.
+        :param run_time: UTC timestamp shared by this reporting run.
+        :return: Report data including criteria, paths, and diagnostics.
+        """
+        report_root = self.workspace / "reports" / submission_root.name
+        report_root.mkdir(parents=True, exist_ok=True)
+        build_root, teacher_files, replaced_files = self._prepare_build_workspace(
+            submission_root, metadata
+        )
+        build_log = report_root / "build-output.log"
+        runtime_log = report_root / "runtime-output.log"
+        build_status, build_output, executable = self._build(build_root)
+        build_log.write_text(build_output, encoding="utf-8")
+        runtime_status, runtime_output = self._run(build_root, executable, build_status)
+        runtime_log.write_text(runtime_output, encoding="utf-8")
+        student_files = metadata.get("student_files", metadata.get("files", []))
+        criteria: list[CriterionResult] = [
+            {
+                "id": "submission.files",
+                "status": "pass" if isinstance(student_files, list) and student_files else "manual_review",
+                "evidence": f"Student files: {student_files}",
+                "automated": True,
+            },
+            {
+                "id": "build.success",
+                "status": build_status,
+                "evidence": str(build_log),
+                "automated": True,
+            },
+            {
+                "id": "runtime.execution",
+                "status": runtime_status,
+                "evidence": str(runtime_log),
+                "automated": True,
+            },
+            {
+                "id": "manual.review",
+                "status": "manual_review",
+                "evidence": "Review notes.md and overrides.json.",
+                "automated": False,
+            },
+        ]
+        if metadata.get("warnings"):
+            criteria.append({
+                "id": "submission.warnings",
+                "status": "warning",
+                "evidence": str(metadata["warnings"]),
+                "automated": True,
+            })
+        metadata.update({
+            "build_workspace": str(build_root),
+            "teacher_files": teacher_files,
+            "replaced_template_files": replaced_files,
+            "last_reported_at": run_time,
+            "build_log": str(build_log),
+            "runtime_log": str(runtime_log),
+            "criteria": criteria,
+            "rule_configuration": self.rule_configuration,
+        })
+        (submission_root / "submission_metadata.json").write_text(
+            json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
+        )
+        (report_root / "notes.md").touch()
+        overrides = report_root / "overrides.json"
+        if not overrides.exists():
+            overrides.write_text("{}\n", encoding="utf-8")
+        return {
+            "metadata": metadata,
+            "student_root": submission_root,
+            "build_root": build_root,
+            "build_log": build_log,
+            "runtime_log": runtime_log,
+            "criteria": criteria,
+        }
 
     def _prepare_build_workspace(
         self, submission_root: Path, metadata: dict[str, object]
@@ -72,13 +184,13 @@ class WorkspaceReporter:
         """Copy the teacher template and overlay one student submission.
 
         :param submission_root: Student-only normalized submission directory.
-        :param metadata: Submission metadata containing the student file list.
+        :param metadata: Submission metadata containing student file names.
         :return: Build directory, copied teacher files, and replaced files.
         """
         build_root = self.workspace / "build-workspaces" / submission_root.name
         if build_root.exists():
             shutil.rmtree(build_root)
-        build_root.mkdir(parents=True)
+        build_root.mkdir(parents=True, exist_ok=True)
         template_root = self.workspace / "references" / "template"
         teacher_files: list[str] = []
         replaced_files: list[str] = []
@@ -89,50 +201,150 @@ class WorkspaceReporter:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, target)
                 teacher_files.append(relative.as_posix())
-        for filename in metadata.get("student_files", metadata.get("files", [])):
-            if not isinstance(filename, str):
-                continue
-            source = submission_root / filename
-            target = build_root / filename
-            if target.exists():
-                replaced_files.append(filename)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
-        metadata["build_workspace"] = str(build_root)
-        metadata["teacher_files"] = teacher_files
-        metadata["replaced_template_files"] = replaced_files
-        (submission_root / "submission_metadata.json").write_text(
-            json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
-        )
+        else:
+            metadata.setdefault("warnings", [])
+            if isinstance(metadata["warnings"], list):
+                metadata["warnings"].append("teacher template is not imported")
+        student_files = metadata.get("student_files", metadata.get("files", []))
+        if isinstance(student_files, list):
+            for filename in student_files:
+                if not isinstance(filename, str):
+                    continue
+                source = submission_root / filename
+                target = build_root / filename
+                if target.exists():
+                    replaced_files.append(filename)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
         return build_root, teacher_files, replaced_files
 
+    def _build(self, build_root: Path) -> tuple[str, str, Path | None]:
+        """Configure and build one prepared C++ workspace.
+
+        :param build_root: Prepared build workspace containing the template and
+            student files.
+        :return: Status, combined build diagnostics, and executable path.
+        """
+        cmake_file = build_root / "CMakeLists.txt"
+        if not cmake_file.is_file():
+            return "skipped", "Build skipped: CMakeLists.txt was not found.\n", None
+        build_dir = build_root / "build"
+        lines = [f"Source directory: {build_root}\n", f"Build directory: {build_dir}\n"]
+        try:
+            configure = subprocess.run(
+                ["cmake", "-S", str(build_root), "-B", str(build_dir)],
+                capture_output=True, text=True, timeout=120, check=False,
+            )
+            lines.extend(["$ cmake configure\n", configure.stdout, configure.stderr])
+            if configure.returncode != 0:
+                return "fail", "".join(lines), None
+            build = subprocess.run(
+                ["cmake", "--build", str(build_dir)],
+                capture_output=True, text=True, timeout=120, check=False,
+            )
+            lines.extend(["$ cmake --build\n", build.stdout, build.stderr])
+            if build.returncode != 0:
+                return "fail", "".join(lines), None
+        except (FileNotFoundError, subprocess.TimeoutExpired) as error:
+            lines.append(f"Build failed: {error}\n")
+            return "fail", "".join(lines), None
+        executable = self._find_executable(cmake_file, build_dir)
+        return "pass", "".join(lines), executable
+
+    def _run(
+        self, build_root: Path, executable: Path | None, build_status: str
+    ) -> tuple[str, str]:
+        """Run a successfully built student program with a timeout.
+
+        :param build_root: Prepared build workspace.
+        :param executable: Executable selected from the CMake target.
+        :param build_status: Result of the build criterion.
+        :return: Runtime status and runtime-only diagnostics.
+        """
+        if build_status != "pass":
+            return "skipped", "Runtime skipped because the build did not pass.\n"
+        if executable is None:
+            return "skipped", "Runtime skipped: executable target was not found.\n"
+        try:
+            result = subprocess.run(
+                [str(executable)], cwd=build_root, capture_output=True, text=True,
+                timeout=self.runtime_timeout, check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            return "fail", f"Runtime timed out after {self.runtime_timeout} seconds.\n{error}\n"
+        except OSError as error:
+            return "fail", f"Runtime could not start: {error}\n"
+        output = result.stdout
+        if result.stderr:
+            output += f"\n[stderr]\n{result.stderr}"
+        output += f"\n[exit status: {result.returncode}]\n"
+        return ("pass" if result.returncode == 0 else "fail"), output
+
     @staticmethod
-    def _write_report(
-        report_path: Path,
-        metadata: dict[str, object],
-        build_root: Path,
-        teacher_files: list[str],
-        replaced_files: list[str],
-    ) -> None:
-        """Write an auditable report for one prepared submission.
+    def _find_executable(cmake_file: Path, build_dir: Path) -> Path | None:
+        """Find the first CMake executable target in the build directory.
+
+        :param cmake_file: CMake project file containing target declarations.
+        :param build_dir: Directory containing built artifacts.
+        :return: Existing executable path, if one can be identified.
+        """
+        contents = cmake_file.read_text(encoding="utf-8", errors="replace")
+        match = re.search(r"add_executable\s*\(\s*([A-Za-z0-9_.+-]+)", contents)
+        if match is None:
+            return None
+        target_name = match.group(1)
+        candidates = [path for path in build_dir.rglob("*") if path.is_file() and path.name == target_name]
+        if not candidates:
+            candidates = [path for path in build_dir.rglob("*") if path.is_file() and path.stem == target_name]
+        return sorted(candidates)[0] if candidates else None
+
+    @staticmethod
+    def _write_report(report_path: Path, outcome: dict[str, object]) -> None:
+        """Write a sectioned plain-text report with criterion evidence.
 
         :param report_path: Destination report text file.
-        :param metadata: Normalized submission metadata.
-        :param build_root: Prepared build workspace path.
-        :param teacher_files: Teacher files copied into the build workspace.
-        :param replaced_files: Teacher files replaced by student files.
+        :param outcome: Report data for one submission.
         """
-        warnings = metadata.get("warnings", [])
+        metadata = outcome["metadata"]
+        assert isinstance(metadata, dict)
+        criteria = outcome["criteria"]
         lines = [
-            f"Submission: {metadata.get('identifier', report_path.parent.name)}",
+            "Submission report", "=================",
+            f"Submission identifier: {metadata.get('identifier', report_path.parent.name)}",
             f"Original filename: {metadata.get('original_filename', '')}",
             f"Source archive: {metadata.get('source_archive', '')}",
-            f"Student workspace: {report_path.parents[1]}",
-            f"Build workspace: {build_root}",
-            f"Teacher files copied: {len(teacher_files)}",
-            f"Student files overlaid: {len(metadata.get('student_files', metadata.get('files', [])))}",
-            f"Template files replaced: {len(replaced_files)}",
-            "Warnings:",
+            f"Student workspace: {outcome['student_root']}",
+            f"Build workspace: {outcome['build_root']}",
+            f"Rule/configuration: {metadata.get('rule_configuration', 'workspace metadata')}",
+            f"Run time (UTC): {metadata.get('last_reported_at', '')}", "",
+            "Criteria", "--------",
         ]
-        lines.extend(f"- {warning}" for warning in warnings if isinstance(warning, str))
+        for criterion in criteria:
+            lines.append(
+                f"[{criterion['status']}] {criterion['id']} "
+                f"(automated={criterion['automated']}): {criterion['evidence']}"
+            )
+        lines.extend([
+            "", f"Build log: {outcome['build_log']}",
+            f"Runtime log: {outcome['runtime_log']}",
+            f"TA notes: {report_path.parent / 'notes.md'}",
+            f"TA overrides: {report_path.parent / 'overrides.json'}",
+        ])
         report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def _write_similarity_report(self, reports_root: Path, run_time: str) -> Path:
+        """Write a separate cohort similarity-analysis status report.
+
+        :param reports_root: Workspace report output directory.
+        :param run_time: UTC timestamp shared by this reporting run.
+        :return: Similarity report path.
+        """
+        path = reports_root / "similarity-report.txt"
+        path.write_text(
+            "Similarity report\n=================\n"
+            f"Run time (UTC): {run_time}\nStatus: not run\n"
+            "Reason: no instructor-provided CodeAnalyzer was found in this workspace.\n"
+            "No similarity score or academic-integrity finding was assigned.\n",
+            encoding="utf-8",
+        )
+        return path

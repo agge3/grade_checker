@@ -568,6 +568,7 @@ def _print_workspace_report_result(result: WorkspaceReportResult) -> None:
     for report_path in result.reports:
         print(f"  Report: {report_path}")
     print(f"Summary report: {result.summary}")
+    print(f"Similarity report: {result.similarity_report}")
 
 
 def _run_report(milestone: str, cfg: config.Config) -> None:

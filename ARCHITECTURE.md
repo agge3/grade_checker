@@ -56,7 +56,7 @@ workspace, then uses `SubmissionImporter` to place the raw
 student-canvas-submissions under `raw/` and
 normalized submissions under `submissions/`.
 
-For each imported submission, the importer also creates an isolated
+When reporting runs, `WorkspaceReporter` creates an isolated
 `build-workspaces/{identifier}/` directory. It copies the imported teacher
 template there first, then overlays the student files so matching template
 files are replaced by the student's version. Submission metadata records both
