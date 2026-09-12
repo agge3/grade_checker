@@ -1,165 +1,237 @@
+"""Loading and validation for milestone grading configuration."""
+
+from collections.abc import Iterator, Mapping
+from pathlib import Path
+from typing import Any, TypedDict, cast
 import json
 
-# xxx do we want a different format, to decouple from the json?
-# Global configuration dictionary.
-#_config = {
-#    "os": "nix",
-#    "class": "",
-#    "methods": [
-#        {
-#            "name": "",
-#            "return": "",
-#            "parameters": [],
-#        }
-#    ],
-#    "build": False,
-#    "output": False,
-#    "files": [],
-#    "points": "",
-#    "extra_credit": {
-#        "enabled": True,
-#        "args": [],
-#    },
-#}
 
-# Global configuration dictionary.
-_config = {}
+class OptionsConfig(TypedDict):
+    """Describe build and output settings from a milestone configuration."""
 
-def validate():
-    """Validates that all necessary keys exist in the _config structure."""
-    required_keys = [
-        'milestone', 'classes', 'methods', 'options', 'grading', 'extra_credit',
-        'files', 'prof', 'org', 'clone', 'glob'
-    ]
+    os: str
+    build: bool
+    check_build: bool
+    output: bool
+    copy: bool
 
-    for key in required_keys:
-        if key not in _config:
-            raise KeyError(f"Missing required key: {key}")
 
-    # Validate nested keys
-    if 'options' in _config:
-        option_keys = ['os', 'build', 'output']
-        for option_key in option_keys:
-            if option_key not in _config['options']:
-                raise KeyError(f"Missing option: {option_key}")
+class GradingConfig(TypedDict, total=False):
+    """Describe point categories used by the grading workflow."""
 
-    if 'grading' in _config and 'points' not in _config['grading']:
+    points: int | float
+    headers: int | float
+    methods: int | float
+    build: int | float
+    extra_credit: int | float
+    total: int | float
+
+
+class ExtraCreditConfig(TypedDict):
+    """Describe optional extra-credit checks."""
+
+    enabled: bool
+    args: list[str]
+
+
+class FetchConfig(TypedDict):
+    """Describe repository-fetching behavior."""
+
+    clear: bool
+
+
+MethodDefinition = TypedDict(
+    "MethodDefinition",
+    {"return": str, "params": list[str] | None},
+)
+MethodsConfig = dict[str, dict[str, MethodDefinition]]
+
+
+class ConfigData(TypedDict):
+    """Describe the complete milestone JSON structure."""
+
+    milestone: str
+    prof: str
+    org: str
+    clone: bool
+    glob: str
+    usernames_file: str
+    classes: list[str]
+    methods: MethodsConfig
+    options: OptionsConfig
+    grading: GradingConfig
+    extra_credit: ExtraCreditConfig
+    fetch: FetchConfig
+    files: list[str]
+
+
+ConfigValue = Any
+
+
+class Config(Mapping[str, ConfigValue]):
+    """Represent one validated milestone configuration.
+
+    :param values: The configuration values loaded from a milestone JSON file.
+    """
+
+    def __init__(self, values: ConfigData) -> None:
+        """Create a configuration object from validated values.
+
+        :param values: The milestone settings to expose through the mapping
+            interface.
+        """
+        self._values = dict(values)
+
+    @property
+    def data(self) -> ConfigData:
+        """Return the typed configuration data.
+
+        :return: The validated configuration using the declared ``ConfigData``
+            structure.
+        """
+        return cast(ConfigData, self._values)
+
+    def __getitem__(self, key: str) -> ConfigValue:
+        """Return a configuration value by key.
+
+        :param key: The top-level configuration key to retrieve.
+        :return: The value associated with ``key``.
+        :raises KeyError: If ``key`` is not present.
+        """
+        return self._values[key]
+
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over the top-level configuration keys.
+
+        :return: An iterator over configuration key names.
+        """
+        return iter(self._values)
+
+    def __len__(self) -> int:
+        """Return the number of top-level configuration values.
+
+        :return: The number of stored configuration keys.
+        """
+        return len(self._values)
+
+    def as_dict(self) -> dict[str, ConfigValue]:
+        """Return a shallow dictionary copy of the configuration.
+
+        :return: A dictionary containing the top-level configuration values.
+        """
+        return dict(self._values)
+
+
+def _validate(values: Mapping[str, ConfigValue]) -> None:
+    """Validate the structure required by the grading workflow.
+
+    :param values: Configuration values to validate.
+    :raises KeyError: If a required setting is missing.
+    :raises TypeError: If a setting has an incompatible structure.
+    """
+    required_keys = {
+        "milestone", "classes", "methods", "options", "grading",
+        "extra_credit", "files", "prof", "org", "clone", "glob",
+    }
+    missing = required_keys - values.keys()
+    if missing:
+        raise KeyError(f"Missing required key(s): {', '.join(sorted(missing))}")
+
+    options = values["options"]
+    if not isinstance(options, Mapping):
+        raise TypeError("Options should be a mapping")
+    for key in ("os", "build", "output"):
+        if key not in options:
+            raise KeyError(f"Missing option: {key}")
+
+    grading = values["grading"]
+    if not isinstance(grading, Mapping):
+        raise TypeError("Grading should be a mapping")
+    if "points" not in grading:
         raise KeyError("Missing grading key: points")
 
-    if 'extra_credit' in _config:
-        extra_credit_keys = ['enabled', 'args']
-        for extra_key in extra_credit_keys:
-            if extra_key not in _config['extra_credit']:
-                raise KeyError(f"Missing extra credit key: {extra_key}")
+    extra_credit = values["extra_credit"]
+    if not isinstance(extra_credit, Mapping):
+        raise TypeError("Extra credit should be a mapping")
+    for key in ("enabled", "args"):
+        if key not in extra_credit:
+            raise KeyError(f"Missing extra credit key: {key}")
 
-    if 'files' in _config and not isinstance(_config['files'], list):
+    if not isinstance(values["files"], list):
         raise TypeError("Files should be a list")
+    if not isinstance(values["classes"], list):
+        raise TypeError("Classes should be a list")
 
-    # Validate methods structure (object with class keys)
-    if 'methods' in _config:
-        if not isinstance(_config['methods'], dict):
-            raise TypeError("Methods should be a dict mapping classes to their methods")
-        
-        # Validate each class has method definitions
-        for clazz, methods in _config['methods'].items():
-            if not isinstance(methods, dict):
-                raise TypeError(f"Methods for class '{clazz}' should be a dict")
-            
-            # Validate each method has required fields
-            for method_name, method_def in methods.items():
-                if 'return' not in method_def:
-                    raise KeyError(f"Method '{method_name}' in class '{clazz}' missing 'return' key")
-                if 'params' not in method_def:
-                    raise KeyError(f"Method '{method_name}' in class '{clazz}' missing 'params' key")
+    methods = values["methods"]
+    if not isinstance(methods, Mapping):
+        raise TypeError("Methods should be a mapping of classes to methods")
+    for clazz, class_methods in methods.items():
+        if not isinstance(class_methods, Mapping):
+            raise TypeError(f"Methods for class '{clazz}' should be a mapping")
+        for method_name, definition in class_methods.items():
+            if not isinstance(definition, Mapping):
+                raise TypeError(f"Definition for method '{method_name}' should be a mapping")
+            for key in ("return", "params"):
+                if key not in definition:
+                    raise KeyError(
+                        f"Method '{method_name}' in class '{clazz}' missing '{key}' key"
+                    )
 
-def merge(milestone):
-    """Merges the milestone configuration into the global _config."""
-    global _config  # Ensure the function modifies the global _config.
 
-    # Construct the full path for the milestone.
-    print(milestone)
-    # BUG: This path is relative to the process working directory, so invoking
-    # the program from outside the repository cannot find the configuration.
-    path = f"milestones/_{milestone}.json"
-    print(path)
+def load_config(milestone: str, config_path: Path | None = None) -> Config:
+    """Load and validate a milestone configuration.
 
-    # Read JSON config from the milestone path.
+    :param milestone: The configuration name, such as ``milestone2-hugh``.
+    :param config_path: Optional explicit path to a JSON configuration file.
+    :return: A configuration object that can be passed to app components.
+    :raises FileNotFoundError: If the configuration file does not exist.
+    :raises ValueError: If the file is not valid JSON.
+    :raises KeyError: If required settings are missing.
+    :raises TypeError: If settings have invalid types.
+    """
+    path = config_path or (
+        Path(__file__).resolve().parent / "milestones" / f"_{milestone}.json"
+    )
     try:
-        with open(path, "r") as file:
-            cfg = json.load(file)
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            f"Error: The file '{path}' was not found. " + 
-            f"Please ensure the path is correct."
-        )
-    except json.JSONDecodeError:
-        raise ValueError(
-            f"Error: The file '{path}' is not a valid JSON file. " + 
-            f"Please check its contents."
-        )
+        with path.open("r", encoding="utf-8") as file:
+            values = json.load(file)
+    except FileNotFoundError as error:
+        raise FileNotFoundError(f"Configuration file '{path}' was not found.") from error
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Configuration file '{path}' is not valid JSON.") from error
 
-    # xxx do we want a different format, to decouple from the json?
-    # Populate the global config map.
-    #_config.update({
-    #    "milestone": cfg.get("milestone", ""),
-    #    "os": cfg.get("os", "nix"),
-    #    "class": cfg.get("class", ""),
-    #    "methods": [
-    #        {
-    #            "name": method.get("name", ""),
-    #            "return": method.get("return", ""),
-    #            "parameters": method.get("parameters", []),
-    #        }
-    #        for method in cfg.get("methods", [])
-    #    ],
-    #    "build": cfg.get("build", False),
-    #    "output": cfg.get("output", False),
-    #    "files": cfg.get("files", []),
-    #    "points": cfg["grading"]["points"],
-    #    "extra_credit": {
-    #        "enabled": cfg.get("extra_credit", {}).get("enabled", True),
-    #        "args": cfg.get("extra_credit", {}).get("args", []),
-    #    },
-    #})
-
-    # Populate the global config map.
-    _config.update(cfg)
-    validate()
+    if not isinstance(values, dict):
+        raise TypeError("The top-level configuration must be a JSON object")
+    _validate(values)
+    return Config(cast(ConfigData, values))
 
 
+def print_config(values: Config) -> None:
+    """Print a human-readable representation of a configuration.
 
-def print_config():
-    """Prints the global _config dictionary in a formatted way."""
-    print(f"Milestone: {_config.get('milestone', '')}")
-    print(f"\tClass: {_config.get('class', '')}")
-
+    :param values: The configuration object to display.
+    """
+    print(f"Milestone: {values.get('milestone', '')}")
+    print(f"\tProfessor: {values.get('prof', '')}")
+    print(f"\tClasses: {values.get('classes', [])}")
     print("\tMethods:")
-    methods = _config.get("methods", {})
-    for method_name, method_details in methods.items():
-        return_type = method_details.get("return", "")
-        parameters = method_details.get("parameter", [])
-        print(f"\t\t{method_name}: returns {return_type}, parameter: {parameters}")
+    for clazz, class_methods in values.get("methods", {}).items():
+        print(f"\t\t{clazz}:")
+        for method_name, definition in class_methods.items():
+            print(
+                f"\t\t\t{method_name}: returns {definition.get('return', '')}, "
+                f"parameters: {definition.get('params', [])}"
+            )
 
+    options = values.get("options", {})
     print("\tOptions:")
-    print(f"\t\tOS: {_config.get('options', {}).get('os', 'nix')}")
-    print(f"\t\tBuild: {_config.get('options', {}).get('build', False)}")
-    print(f"\t\tOutput: {_config.get('options', {}).get('output', False)}")
+    print(f"\t\tOS: {options.get('os', 'nix')}")
+    print(f"\t\tBuild: {options.get('build', False)}")
+    print(f"\t\tOutput: {options.get('output', False)}")
+    print(f"\tGrading points: {values.get('grading', {}).get('points', '')}")
+    print(f"\tExtra credit: {values.get('extra_credit', {})}")
+    print(f"\tFiles: {values.get('files', [])}")
 
-    print("\tGrading:")
-    print(f"\t\tPoints: {_config.get('grading', {}).get('points', '')}")
 
-    print("\tExtra Credit:")
-    extra_credit = _config.get("extra_credit", {})
-    print(f"\t\tEnabled: {extra_credit.get('enabled', True)}")
-    print(f"\t\tArgs: {extra_credit.get('args', [])}")
-
-    print("\tFiles:")
-    files = _config.get("files", [])
-    for file in files:
-        print(f"\t\t{file}")
-
-# Example usage
 if __name__ == "__main__":
-    merge("milestone1")
-    print_config()
-    methods_to_strlst()
+    print_config(load_config("milestone1-hugh"))

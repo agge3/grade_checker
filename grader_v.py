@@ -36,55 +36,55 @@ def main():
     reg = re.search(r"^(\w+)-.*$", args.milestone)
     milestone = reg[1]  # expected output: milestoneX
 
-    config.merge(args.milestone)
+    cfg = config.load_config(args.milestone)
     
     if args.command == "fetch":
-      fetcher = NewFetcher(config._config)
+      fetcher = NewFetcher(cfg)
       fetcher.fetch()
         #  Auth.Token()
 
     # BUG: args.fetch/grade/report do not exist because those argparse options
     # are commented out above.
     if args.fetch:
-        fetcher = Fetcher(milestone, config._config)
+        fetcher = Fetcher(milestone, cfg)
         fetcher.fetch()
 
     if args.grade:
         shell = Shell()
-        grader = Grader(shell, milestone, config)
+        grader = Grader(shell, milestone, cfg)
 
         name = ""   # pwd and regex capture project root
-        score = config._config["grading"]["total"]
+        score = cfg["grading"]["total"]
         
-        if config._config["options"]["build"]:
+        if cfg["options"]["build"]:
             build = Build()
             out, res = build.make_run()
             
             if not res:
-                score -= config._config["grading"]["build"]
+                score -= cfg["grading"]["build"]
                 print("Build unsuccessful. Report:")
                 print(out)
             else:
                 print("Build successful. Report:")
                 print(out)
 
-        if config._config["extra_credit"]["enabled"]:
-            pts, out = grader.check_ec(config._config["extra_credit"]["args"])
-            score += config._config["grading"]["extra_credit"]
+        if cfg["extra_credit"]["enabled"]:
+            pts, out = grader.check_ec(cfg["extra_credit"]["args"])
+            score += cfg["grading"]["extra_credit"]
             print(out)
 
 
-        pts, out = grader.check_headers(config._config["grading"]["headers"])
+        pts, out = grader.check_headers(cfg["grading"]["headers"])
         score -= pts
         print(out)
 
-        pts, out = grader.check_func(config._config["grading"]["methods"])
+        pts, out = grader.check_func(cfg["grading"]["methods"])
         score -= pts
         print(out)
 
     if args.report:
         print("main: Entered Reporter.")
-        reporter = Reporter2(milestone, config._config)
+        reporter = Reporter2(milestone, cfg)
         reporter._report()
         reporter.report()
         # xxx we always build. keep track of what's already built to not build

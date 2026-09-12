@@ -1,4 +1,3 @@
-import config
 from core.shell import Shell
 from core.build import Build
 from core.file_processor import FileProcessor
@@ -32,7 +31,9 @@ class Grader:
     def __init__(self, shell, milestone, config):
         self._shell = shell
         self._milestone = milestone
-        self._config = config._config
+        # Configuration is supplied explicitly so graders do not depend on
+        # mutable module-level state.
+        self._config = config
 
         self._milestone = milestone
         print(f"Fetcher:\tmilestone:\t{self._milestone}")

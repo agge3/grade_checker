@@ -74,27 +74,27 @@ def main():
     reg = re.search(r"^(\w+)-.*$", args.milestone)
     milestone = reg[1]  # expected output: milestoneX
 
-    config.merge(args.milestone)
+    cfg = config.load_config(args.milestone)
 
     if args.fetch:
-        fetcher = Fetcher(milestone, config._config)
+        fetcher = Fetcher(milestone, cfg)
         fetcher.fetch()
 
     if args.grade:
         shell = Shell()
-        grader = Grader(shell, milestone, config)
+        grader = Grader(shell, milestone, cfg)
 
         name = ""   # pwd and regex capture project root
-        score = config._config["grading"]["points"]
+        score = cfg["grading"]["points"]
         # BUG: The score is initialized but never updated, displayed, returned,
         # or written to a report in this code path.
         
-        if config._config["options"]["build"]:
-            build = Build(milestone, config._config)
+        if cfg["options"]["build"]:
+            build = Build(milestone, cfg)
             out, res = build.make_run()
             
             if not res:
-                # score -= config._config["grading"]["build"]
+                # score -= cfg["grading"]["build"]
                 print("Build unsuccessful. Report:")
                 print(out)
 
@@ -104,17 +104,17 @@ def main():
                 print("Build successful. Report:")
                 print(out)
 
-        # if config._config["extra_credit"]["enabled"]:
-            # pts, out = grader.check_ec(config._config["extra_credit"]["args"])
-            # score += config._config["grading"]["extra_credit"]
+        # if cfg["extra_credit"]["enabled"]:
+            # pts, out = grader.check_ec(cfg["extra_credit"]["args"])
+            # score += cfg["grading"]["extra_credit"]
             # print(out)
 
 
-        # pts, out = grader.check_headers(config._config["grading"]["headers"])
+        # pts, out = grader.check_headers(cfg["grading"]["headers"])
         # score -= pts
         # print(out)
 
-        # pts, out = grader.check_func(config._config["grading"]["methods"])
+        # pts, out = grader.check_func(cfg["grading"]["methods"])
         # score -= pts
         # print(out)
 
@@ -122,7 +122,7 @@ def main():
         # BUG: Reporter2 currently calls Build and Grader with signatures that
         # do not match their active class definitions, so reporting cannot run.
         print("main: Entered Reporter.")
-        reporter = Reporter2(milestone, config._config)
+        reporter = Reporter2(milestone, cfg)
         reporter._report()
         reporter.report()
         # xxx we always build. keep track of what's already built to not build
