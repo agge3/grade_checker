@@ -102,6 +102,54 @@ output directory, and the milestone's required filename. It preserves the raw
 ZIP and creates normalized workspaces under `submissions/`, with provenance in
 `submission_metadata.json`.
 
+### Create a grading workspace
+
+Initialize an empty grading workspace interactively:
+
+```bash
+python3 main.py create-workspace
+```
+
+The command prompts for a workspace name and optional milestone
+configuration. Workspaces are created under the application root's
+`grading-workspaces/` directory. `--output` and `--milestone` may be supplied
+to skip those prompts. Each workspace contains `raw/`, `submissions/`,
+`build-workspaces/`, `reports/`, and `references/`, plus `workspace.json`.
+Submission archive importing is a separate future workflow.
+
+For example:
+
+```text
+$ python3 main.py create-workspace
+Workspace name [grading-workspace]: milestone2
+Milestone configuration (optional): milestone2-hugh
+Created grading workspace: .../grading-workspaces/milestone2
+Workspace configuration: .../grading-workspaces/milestone2/workspace.json
+Milestone: milestone2-hugh
+```
+
+This creates the following workspace below the repository root:
+
+```text
+grading-workspaces/
+└── milestone2/
+    ├── build-workspaces/
+    ├── raw/
+    ├── references/
+    ├── reports/
+    ├── submissions/
+    └── workspace.json
+```
+
+The milestone prompt may be left blank when the workspace is not yet tied to a
+specific grading configuration. To provide values without prompts:
+
+```bash
+python3 main.py create-workspace \
+  --output grading-workspaces/milestone2 \
+  --milestone milestone2-hugh
+```
+
 ## TODO
  * m3 onwards has a master _milestoneX.json schema change to allow for multiple
    files. refactor previous milestones to use new multiple file schema

@@ -9,17 +9,21 @@ Global variables
 
 import config
 from tools import util
-from core.shell import Shell
-from core.build import Build
-from core.fetch import Fetcher
-from core.grader import Grader
-from core.reporter2 import Reporter2
 
 import argparse
 import re
+import sys
+from pathlib import Path
+from typing import Sequence
+
+from core.workspace import Workspace, create_workspace as initialize_workspace
 
 # Grade HashTable.
 def grade_hash_table():
+    from core.build import Build
+    from core.grader import Grader
+    from core.shell import Shell
+
     # BUG: This legacy helper is never called and uses obsolete Build/Grader
     # constructor signatures and obsolete check-method signatures.
     shell = Shell()
@@ -56,7 +60,96 @@ def grade_hash_table():
     return score  # Return the final grade score
 
 
-def main():
+def _create_workspace_parser() -> argparse.ArgumentParser:
+    """Build the parser for the workspace-creation command.
+
+    :return: Parser describing optional non-interactive defaults.
+    """
+    parser = argparse.ArgumentParser(
+        prog="Grade Checker create-workspace",
+        description="Interactively create an empty grading workspace.",
+    )
+    parser.add_argument(
+        "--output",
+        help="Workspace directory to use instead of prompting",
+    )
+    parser.add_argument(
+        "--milestone",
+        help="Milestone configuration name to use instead of prompting",
+    )
+    return parser
+
+
+def _print_workspace_result(workspace: Workspace) -> None:
+    """Print the paths created by workspace initialization.
+
+    :param workspace: Initialized grading workspace to summarize.
+    """
+    print(f"Created grading workspace: {workspace.root}")
+    print(f"Workspace configuration: {workspace.configuration_path}")
+    if workspace.milestone:
+        print(f"Milestone: {workspace.milestone}")
+
+
+def _interactive_workspace_path(workspace_name: str) -> Path:
+    """Build a safe workspace path below the application workspace collection.
+
+    :param workspace_name: User-provided name for the new grading workspace.
+    :return: Path below ``grading-workspaces`` in the current directory.
+    :raises ValueError: If the name is empty, absolute, or escapes the
+        workspace collection.
+    """
+    name = Path(workspace_name)
+    if not workspace_name or name.is_absolute() or ".." in name.parts:
+        raise ValueError("Workspace name must be a relative directory name.")
+    return Path.cwd() / "grading-workspaces" / name
+
+
+def create_workspace(arguments: Sequence[str]) -> int:
+    """Interactively initialize an empty grading workspace.
+
+    :param arguments: Command-line arguments following ``create-workspace``.
+    :return: Zero after the workspace is initialized.
+    :raises FileExistsError: If the selected directory already has a workspace
+        configuration.
+    """
+    parser = _create_workspace_parser()
+    args = parser.parse_args(list(arguments))
+    if args.output:
+        output = Path(args.output)
+    else:
+        workspace_name = input("Workspace name [grading-workspace]: ").strip()
+        output = _interactive_workspace_path(workspace_name or "grading-workspace")
+    milestone = args.milestone or input(
+        "Milestone configuration (optional): "
+    ).strip() or None
+    configuration_path = None
+    if milestone:
+        config.load_config(milestone)
+        configuration_path = (
+            Path(config.__file__).resolve().parent
+            / "milestones"
+            / f"_{milestone}.json"
+        )
+    workspace = initialize_workspace(
+        output,
+        milestone=milestone,
+        configuration_path=configuration_path,
+    )
+    _print_workspace_result(workspace)
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run the grading CLI while preserving the legacy milestone commands.
+
+    :param argv: Arguments to parse, or ``sys.argv[1:]`` when omitted.
+    :return: Zero after the selected command completes.
+    """
+    command_arguments = list(sys.argv[1:] if argv is None else argv)
+    if command_arguments and command_arguments[0] == "create-workspace":
+        return create_workspace(command_arguments[1:])
+
     parser = argparse.ArgumentParser(
             prog = "Grade Checker"
     )
@@ -68,7 +161,7 @@ def main():
     parser.add_argument("-r", "--report", action="store_true",
                         help="Grade and report fetched repos.")
 
-    args = parser.parse_args()
+    args = parser.parse_args(command_arguments)
 
     # EXPECTS: _milestoneX-hugh.json
     reg = re.search(r"^(\w+)-.*$", args.milestone)
@@ -77,10 +170,16 @@ def main():
     cfg = config.load_config(args.milestone)
 
     if args.fetch:
+        from core.fetch import Fetcher
+
         fetcher = Fetcher(milestone, cfg)
         fetcher.fetch()
 
     if args.grade:
+        from core.build import Build
+        from core.grader import Grader
+        from core.shell import Shell
+
         shell = Shell()
         grader = Grader(shell, milestone, cfg)
 
@@ -119,6 +218,8 @@ def main():
         # print(out)
 
     if args.report:
+        from core.reporter2 import Reporter2
+
         # BUG: Reporter2 currently calls Build and Grader with signatures that
         # do not match their active class definitions, so reporting cannot run.
         print("main: Entered Reporter.")
@@ -131,7 +232,7 @@ def main():
 
 
         
-
+    return 0
 
 
 if __name__ == "__main__":

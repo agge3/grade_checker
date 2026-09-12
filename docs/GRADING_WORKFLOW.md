@@ -161,25 +161,27 @@ the original archive.
 ## Intended TA workflow
 
 1. The TA invokes the application's workspace-creation CLI command.
-2. The application interactively prompts the TA for the student-submission ZIP,
-   teacher ZIP, and the template ZIP's location inside the teacher ZIP. The TA
-   also associates the reference solution, expected-output log, and grading
-   spreadsheet with the workspace.
-3. The application validates and preserves the original inputs.
-4. The application discovers individual submissions and creates an isolated,
+2. The application interactively prompts for the workspace directory and
+   optional milestone configuration, then creates the empty workspace layout
+   and writes its workspace configuration.
+3. The TA later supplies the student-submission ZIP, teacher ZIP, template,
+   reference solution, expected-output log, and grading spreadsheet through the
+   import/setup workflow.
+4. The application validates and preserves the original inputs.
+5. The application discovers individual submissions and creates an isolated,
    normalized workspace for each one. The submission's internal name is based
    on the Canvas-generated filename metadata, excluding the optional `[LATE]`
    marker and the optional duplicate-attempt suffix such as `-2`.
-5. The application applies the assignment configuration and instructor-provided
+6. The application applies the assignment configuration and instructor-provided
    files, then runs the enabled checks.
-6. The application builds and, where applicable, executes each submission with
+7. The application builds and, where applicable, executes each submission with
    explicit timeout and failure behavior.
-7. The application produces a report for every submission, including
+8. The application produces a report for every submission, including
    successes, failures, warnings, evidence, and checks requiring manual review.
-8. The TA reviews reports, manually maps each submission to a student, resolves
+9. The TA reviews reports, manually maps each submission to a student, resolves
    unusual cases using notes or overrides, and transfers the relevant results
    into the spreadsheet.
-9. The workspace remains reproducible so the TA can rerun grading after fixing
+10. The workspace remains reproducible so the TA can rerun grading after fixing
    one submission or changing a grading rule.
 
 The original archives and raw run results should remain separate from any
