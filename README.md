@@ -9,6 +9,9 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+The interactive workspace selector uses `questionary`, which is installed by
+the requirements above.
+
 #### env
 ```bash
 USERNAME=${github_username}

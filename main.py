@@ -198,12 +198,35 @@ def _existing_workspaces() -> list[Path]:
     )
 
 
+def _clean_entered_value(value: str) -> str:
+    """Normalize a value pasted into a prompt or dragged from a file browser.
+
+    :param value: Raw text entered by the user.
+    :return: Trimmed text with one matching pair of surrounding quotes removed.
+    """
+    cleaned = value.strip()
+    if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in "'\"":
+        return cleaned[1:-1]
+    return cleaned
+
+
 def _custom_workspace_path() -> str:
-    """Prompt for a workspace path supplied manually by the user.
+    """Prompt for a manually supplied path with editing and completion.
 
     :return: The entered workspace path with surrounding whitespace removed.
+    :raises EOFError: If interactive input ends before the path is entered.
     """
-    return input("Custom workspace directory: ").strip()
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        return _clean_entered_value(input("Custom workspace directory: "))
+    try:
+        import questionary
+    except ImportError:
+        return input("Custom workspace directory: ").strip()
+
+    answer = questionary.path("Workspace directory:").ask()
+    if answer is None:
+        raise ValueError("Workspace path prompt was cancelled.")
+    return _clean_entered_value(answer)
 
 
 def _select_workspace_numbered(options: list[Path | str]) -> str:
@@ -243,36 +266,19 @@ def _select_workspace_interactively() -> str:
         return _select_workspace_numbered(options)
 
     try:
-        import termios
-        import tty
+        import questionary
     except ImportError:
         return _select_workspace_numbered(options)
 
-    selected_index = 0
-    print("Select a workspace (↑/↓ to move, Enter to select):")
-    while True:
-        for index, option in enumerate(options):
-            marker = ">" if index == selected_index else " "
-            label = str(option) if isinstance(option, Path) else option
-            print(f"\r{marker} {label}\033[K")
-        print(f"\033[{len(options)}A", end="", flush=True)
-        file_descriptor = sys.stdin.fileno()
-        original_settings = termios.tcgetattr(file_descriptor)
-        try:
-            tty.setraw(file_descriptor)
-            key = sys.stdin.read(1)
-            if key == "\x1b":
-                sequence = sys.stdin.read(2)
-                if sequence == "[A":
-                    selected_index = (selected_index - 1) % len(options)
-                elif sequence == "[B":
-                    selected_index = (selected_index + 1) % len(options)
-            elif key in ("\r", "\n"):
-                print()
-                selected = options[selected_index]
-                return _custom_workspace_path() if selected == custom_label else str(selected)
-        finally:
-            termios.tcsetattr(file_descriptor, termios.TCSADRAIN, original_settings)
+    selected = questionary.select(
+        "Select a workspace:",
+        choices=[str(option) for option in choices] + [custom_label],
+    ).ask()
+    if selected == custom_label:
+        return _custom_workspace_path()
+    if selected is None:
+        raise ValueError("Workspace selection was cancelled.")
+    return selected
 
 
 def import_submissions(arguments: Sequence[str]) -> int:
@@ -287,16 +293,50 @@ def import_submissions(arguments: Sequence[str]) -> int:
     """
     parser = _import_submissions_parser()
     args = parser.parse_args(list(arguments))
-    workspace_value = args.workspace or _select_workspace_interactively()
-    submissions_value = args.student_canvas_submissions or input(
-        "Student-canvas-submissions ZIP: "
-    ).strip()
-    required_file = args.required_file or input("Required student filename: ").strip()
+    try:
+        import questionary
+    except ImportError:
+        questionary = None
+    workspace_value = (
+        _clean_entered_value(args.workspace)
+        if args.workspace
+        else _select_workspace_interactively()
+    )
+    if args.student_canvas_submissions:
+        submissions_value = args.student_canvas_submissions
+    elif questionary is None:
+        submissions_value = _clean_entered_value(
+            input("Student-canvas-submissions ZIP: ")
+        )
+    else:
+        submissions_value = questionary.path("Student-canvas-submissions ZIP:").ask()
+        if submissions_value is None:
+            raise ValueError("Student-canvas-submissions prompt was cancelled.")
+        submissions_value = _clean_entered_value(submissions_value)
+    if args.required_file:
+        required_file = args.required_file
+    elif questionary is None:
+        required_file = _clean_entered_value(input("Required student filename: "))
+    else:
+        required_file = questionary.text("Required student filename:").ask()
+        if required_file is None:
+            raise ValueError("Required filename prompt was cancelled.")
+        required_file = _clean_entered_value(required_file)
     optional_files = args.optional_files
     if optional_files is None:
-        optional_value = input("Optional files [README.md]: ").strip()
+        if questionary is None:
+            optional_value = input("Optional files [README.md]: ")
+        else:
+            optional_value = questionary.text(
+                "Optional files (comma-separated) [README.md]:"
+            ).ask()
+            if optional_value is None:
+                raise ValueError("Optional files prompt was cancelled.")
+            optional_value = optional_value.strip()
         optional_files = [
-            item.strip() for item in optional_value.split(",") if item.strip()
+            _clean_entered_value(item)
+            for item in optional_value.split(",")
+            if _clean_entered_value(item)
         ] or ["README.md"]
     if not workspace_value or not submissions_value or not required_file:
         raise ValueError("Workspace, student-canvas-submissions, and required filename are required.")
