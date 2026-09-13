@@ -258,9 +258,19 @@ class SubmissionImporter:
         :return: Recovery flag, copied names, and review warnings.
         """
         copied: list[str] = []
-        warnings = ["submission ZIP preserved in the raw archive and root files were recovered"]
+        zip_warning = (
+            "student submitted a ZIP file; checking the root of the student's "
+            "ZIP submission for required files"
+        )
+        warnings = [
+            zip_warning,
+            "submission ZIP preserved in the raw archive and root files were recovered",
+        ]
         if self.required_filename is None:
-            return False, copied, ["submitted ZIP cannot be normalized without a required filename"]
+            return False, copied, [
+                zip_warning,
+                "submitted ZIP cannot be normalized without a required filename",
+            ]
         import io
         with archive.open(member) as source:
             data = io.BytesIO(source.read())
@@ -270,7 +280,11 @@ class SubmissionImporter:
                         if not info.is_dir() and len(PurePosixPath(info.filename).parts) == 1]
                 required = [info for info in root if info.filename == self.required_filename]
                 if len(required) != 1:
-                    return False, copied, ["required file is missing or ambiguous at the submitted ZIP root"]
+                    return False, copied, [
+                        zip_warning,
+                        "required file is missing or ambiguous at the root of "
+                        "the student's ZIP submission",
+                    ]
                 allowed = {self.required_filename, *self.optional_filenames}
                 for info in root:
                     if info.filename in allowed:
@@ -284,7 +298,7 @@ class SubmissionImporter:
                     warnings.append("nested files in the submitted ZIP require manual review")
                 return True, copied, warnings
         except BadZipFile:
-            return False, copied, ["submitted ZIP is malformed"]
+            return False, copied, [zip_warning, "submitted ZIP is malformed"]
 
     def _internal_name(self, source_name: str) -> str:
         """Create a stable filesystem-safe name from a Canvas filename.
