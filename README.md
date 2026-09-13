@@ -141,7 +141,9 @@ python3 main.py report
 
 It selects an initialized workspace, prepares each submission's build
 workspace at report time, and writes per-submission reports plus
-`reports/summary.txt`. For scripted runs, provide the workspace directly:
+`reports/summary.md`. The summary is a Markdown table containing submission,
+build, and runtime statuses plus method and required-file counts. For scripted
+runs, provide the workspace directly:
 
 ```bash
 python3 main.py report --workspace grading-workspaces/milestone2

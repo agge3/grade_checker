@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 import json
 from pathlib import Path
 import re
@@ -74,8 +74,13 @@ class WorkspaceReporter:
         )
         reports_root = self.workspace / "reports"
         reports_root.mkdir(parents=True, exist_ok=True)
-        run_time = datetime.now(timezone.utc).isoformat()
+        local_now = datetime.now().astimezone().replace(microsecond=0)
+        timezone_name = local_now.tzname() or "local"
+        run_time = (
+            f"{local_now.strftime('%Y-%m-%d %H:%M:%S')} ({timezone_name})"
+        )
         reports: list[Path] = []
+        summary_rows: list[dict[str, object]] = []
         submissions_root = self.workspace / "submissions"
         selected_submissions = (
             [submission] if isinstance(submission, str) else list(submission or [])
@@ -131,6 +136,21 @@ class WorkspaceReporter:
                 report_path.parent.mkdir(parents=True, exist_ok=True)
                 self._write_report(report_path, outcome)
                 reports.append(report_path)
+                legacy_details = outcome["legacy_details"]
+                assert isinstance(legacy_details, dict)
+                student_files = metadata.get("student_files", metadata.get("files", []))
+                summary_rows.append({
+                    "submission": submission_root.name,
+                    "submission_status": self._submission_status(metadata),
+                    "build_status": outcome["build_status"],
+                    "runtime_status": outcome["runtime_status"],
+                    "methods_found": legacy_details["methods_found"],
+                    "methods_expected": legacy_details["methods_expected"],
+                    "required_files_found": self._required_files_found(metadata),
+                    "required_files_expected": self._required_files_expected(metadata),
+                    "method_headers_found": legacy_details["method_headers_found"],
+                    "method_headers_expected": legacy_details["method_headers_expected"],
+                })
                 print(
                     f"Reporting {index}/{total} {submission_root.name}: "
                     f"build={outcome['build_status']} "
@@ -139,21 +159,101 @@ class WorkspaceReporter:
                     flush=True,
                 )
 
-        summary = reports_root / "summary.txt"
-        summary.write_text(
-            f"Workspace path prefix: {self.workspace}\n"
-            f"Run time (UTC): {run_time}\n"
-            f"Submissions reported: {len(reports)}\n"
-            + "\n".join(
-                f"- {self._display_workspace_path(path)}" for path in reports
-            )
-            + "\n",
-            encoding="utf-8",
-        )
+        summary = reports_root / "summary.md"
+        summary.write_text(self._write_summary(summary_rows, run_time), encoding="utf-8")
         similarity_report = self._write_similarity_report(reports_root, run_time)
         return WorkspaceReportResult(
             self.workspace, tuple(reports), summary, similarity_report
         )
+
+    @staticmethod
+    def _submission_status(metadata: dict[str, object]) -> str:
+        """Determine the high-level status of an imported submission.
+
+        :param metadata: Submission metadata containing files and warnings.
+        :return: ``pass``, ``warning``, or ``missing``.
+        """
+        student_files = metadata.get("student_files", metadata.get("files", []))
+        if not isinstance(student_files, list) or not student_files:
+            return "missing"
+        return "warning" if metadata.get("warnings") else "pass"
+
+    @staticmethod
+    def _required_files_found(metadata: dict[str, object]) -> int:
+        """Count configured required files present in a submission.
+
+        :param metadata: Submission metadata containing expected and copied
+            file names.
+        :return: Number of required files found.
+        """
+        student_files = metadata.get("student_files", metadata.get("files", []))
+        if not isinstance(student_files, list):
+            return 0
+        required_files = metadata.get("required_files")
+        if not isinstance(required_files, list) or not required_files:
+            return len(student_files)
+        return sum(
+            isinstance(required, str) and required in student_files
+            for required in required_files
+        )
+
+    @staticmethod
+    def _required_files_expected(metadata: dict[str, object]) -> int:
+        """Count configured required files for a submission.
+
+        :param metadata: Submission metadata containing expected file names.
+        :return: Number of required files expected.
+        """
+        required_files = metadata.get("required_files")
+        if isinstance(required_files, list) and required_files:
+            return len(required_files)
+        student_files = metadata.get("student_files", metadata.get("files", []))
+        return len(student_files) if isinstance(student_files, list) else 0
+
+    def _write_summary(
+        self, rows: list[dict[str, object]], run_time: str
+    ) -> str:
+        """Build the Markdown summary table for a reporting run.
+
+        :param rows: Per-submission status and grading counts.
+        :param run_time: Local timestamp for this reporting run.
+        :return: Markdown document content.
+        """
+        expected = rows[0] if rows else {}
+        headers = [
+            "Submission", "Submission status", "Build status", "Runtime status",
+            f"Methods found (expected: {expected.get('methods_expected', 0)})",
+            f"Required files found (expected: {expected.get('required_files_expected', 0)})",
+            f"Method headers found (expected: {expected.get('method_headers_expected', 0)})",
+        ]
+        table_rows = [
+            [
+                str(row["submission"]), str(row["submission_status"]),
+                str(row["build_status"]), str(row["runtime_status"]),
+                str(row["methods_found"]), str(row["required_files_found"]),
+                str(row["method_headers_found"]),
+            ]
+            for row in rows
+        ]
+        widths = [
+            max([len(headers[index])] + [len(row[index]) for row in table_rows])
+            for index in range(len(headers))
+        ]
+        format_row = lambda values: "| " + " | ".join(
+            value.ljust(widths[index]) for index, value in enumerate(values)
+        ) + " |"
+        separator = "| " + " | ".join(
+            "-" * max(3, width) for width in widths
+        ) + " |"
+        lines = [
+            "# Grading Summary", "",
+            f"Workspace path prefix: `{self.workspace}`  ",
+            f"Ran at: {run_time}  ",
+            f"Submissions reported: {len(rows)}", "",
+            format_row(headers), separator,
+            *(format_row(row) for row in table_rows),
+        ]
+        return "\n".join(lines) + "\n"
 
     def _display_workspace_path(self, path: Path) -> str:
         """Render a workspace path relative to the reported workspace root.
@@ -353,6 +453,18 @@ class WorkspaceReporter:
             "method_headers": method_headers or {
                 "(no configured methods)": ["Needs manual review."]
             },
+            "methods_found": sum(
+                str(result).startswith("FOUND")
+                for results in methods.values() for result in results
+            ),
+            "methods_expected": sum(len(results) for results in methods.values()),
+            "method_headers_found": sum(
+                str(result).startswith("FOUND")
+                for results in method_headers.values() for result in results
+            ),
+            "method_headers_expected": sum(
+                len(results) for results in method_headers.values()
+            ),
             "gtest_check": gtest_check,
             "output_check": output_check,
         }
@@ -622,7 +734,7 @@ class WorkspaceReporter:
             f"Student workspace: {WorkspaceReporter._display_report_path(outcome['workspace_root'], outcome['student_root'])}",
             f"Build workspace: {WorkspaceReporter._display_report_path(outcome['workspace_root'], outcome['build_root'])}",
             f"Rule/configuration: {metadata.get('rule_configuration', 'workspace metadata')}",
-            f"Run time (UTC): {metadata.get('last_reported_at', '')}", "",
+            f"Ran at: {metadata.get('last_reported_at', '')}", "",
             "Criteria", "--------",
         ]
         for criterion in criteria:
@@ -708,7 +820,7 @@ class WorkspaceReporter:
         path = reports_root / "similarity-report.txt"
         path.write_text(
             "Similarity report\n=================\n"
-            f"Run time (UTC): {run_time}\nStatus: not run\n"
+            f"Ran at: {run_time}\nStatus: not run\n"
             "Reason: no instructor-provided CodeAnalyzer was found in this workspace.\n"
             "No similarity score or academic-integrity finding was assigned.\n",
             encoding="utf-8",

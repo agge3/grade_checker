@@ -219,6 +219,9 @@ class SubmissionImporter:
             "recovered_from_archive": recovered,
             "files": copied,
             "student_files": copied,
+            "required_files": [self.required_filename]
+            if self.required_filename
+            else [],
             "warnings": warnings,
         }
         with (workspace / "submission_metadata.json").open("w", encoding="utf-8") as file:
