@@ -114,7 +114,8 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertIn("<workspace-path>/reports/student/build-output.log", report_text)
             self.assertNotIn(f"Student workspace: {workspace}", report_text)
             for section in (
-                "File Headers", "Methods", "GTest Check", "Output Check",
+                "File Headers", "Methods", "Method Headers", "GTest Check",
+                "Output Check",
             ):
                 self.assertIn(section, report_text)
             self.assertIn("Summary: 0 found, 0 missing.", report_text)
