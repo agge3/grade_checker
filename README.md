@@ -162,6 +162,13 @@ Repeat `--submission` to report a selected group of submissions.
 To create a directory of convenient symlinks to the generated reports:
 
 ```bash
+python3 main.py generate-index-report
+```
+
+The command interactively selects an initialized workspace when
+`--workspace` is omitted. For scripted use, provide the workspace explicitly:
+
+```bash
 python3 main.py generate-index-report \
   --workspace grading-workspaces/milestone2
 ```

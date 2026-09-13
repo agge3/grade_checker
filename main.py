@@ -642,8 +642,7 @@ def _report_index_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--workspace",
-        required=True,
-        help="Initialized grading workspace directory",
+        help="Initialized grading workspace directory; prompts if omitted",
     )
     parser.add_argument(
         "--output",
@@ -659,7 +658,8 @@ def report_index(arguments: Sequence[str]) -> int:
     :return: Zero after the index is created.
     """
     args = _report_index_parser().parse_args(list(arguments))
-    result = create_report_index(args.workspace, args.output)
+    workspace = args.workspace or _select_workspace_interactively()
+    result = create_report_index(workspace, args.output)
     print(f"Report index: {result.directory}")
     print(f"Report links created: {len(result.links)}")
     return 0

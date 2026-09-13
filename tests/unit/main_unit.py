@@ -8,6 +8,7 @@ from unittest.mock import patch
 import json
 
 import main
+from core.report_index import ReportIndexResult
 from core.teacher_importer import TeacherImporter
 
 
@@ -82,6 +83,16 @@ class TeacherImportTests(unittest.TestCase):
             main.main(["generate-index-report", "--workspace", "workspace"]), 0
         )
         report_index.assert_called_once_with(["--workspace", "workspace"])
+
+    @patch("main.create_report_index", return_value=ReportIndexResult(Path("index"), ()))
+    @patch("main._select_workspace_interactively", return_value="selected-workspace")
+    def test_report_index_selects_workspace_interactively(
+        self, select_workspace, create_index
+    ) -> None:
+        """Ensure the index command prompts when no workspace is supplied."""
+        self.assertEqual(main.report_index([]), 0)
+        select_workspace.assert_called_once_with()
+        create_index.assert_called_once_with("selected-workspace", None)
 
 
 class WorkspaceReportTests(unittest.TestCase):
