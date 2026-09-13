@@ -20,6 +20,7 @@ class TeacherImportResult:
     template_root: Path
     reference_root: Path
     metadata_path: Path
+    ignored_template_files: tuple[str, ...] = ()
 
 
 class TeacherImporter:
@@ -93,15 +94,22 @@ class TeacherImporter:
                         template_files = self._extract_template(
                             template_archive, template_root
                         )
+                        ignored_template_files = [
+                            info.filename for info in template_archive.infolist()
+                            if not info.is_dir()
+                            and PurePosixPath(info.filename).name.endswith(
+                                ".grader-ignore"
+                            )
+                        ]
                 except BadZipFile as error:
                     raise ValueError("The selected teacher template is not a valid ZIP file.") from error
         except BadZipFile as error:
             raise ValueError(f"Teacher ZIP '{self.archive_path}' is not a valid ZIP file.") from error
-
         metadata = {
             "source_archive": str(self.archive_path),
             "template_member": self.template_member,
             "template_files": template_files,
+            "ignored_template_files": ignored_template_files,
             "reference_files": reference_files,
         }
         with (references_root / "teacher_metadata.json").open("w", encoding="utf-8") as file:
@@ -115,6 +123,7 @@ class TeacherImporter:
             template_root,
             teacher_root,
             references_root / "teacher_metadata.json",
+            tuple(ignored_template_files),
         )
 
     def find_template_members(self) -> list[str]:

@@ -391,6 +391,9 @@ should provide:
   and relevant execution diagnostics.
 - Checks that were skipped, disabled, or not applicable.
 - A clear distinction between failure, warning, and manual review.
+- Workflow flags for archive recovery, late markers, file provenance,
+  configuration mismatches, expected-output checks, template-file changes, and
+  similarity-analysis status.
 - A location for TA notes and overrides.
 
 The application does not calculate points or assign grades. It provides

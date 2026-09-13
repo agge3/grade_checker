@@ -120,7 +120,7 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertNotIn(f"Student workspace: {workspace}", report_text)
             for section in (
                 "File Headers", "Methods", "Method Headers", "GTest Check",
-                "Output Check",
+                "Output Check", "Workflow Flags", "Expected output:",
             ):
                 self.assertIn(section, report_text)
             self.assertIn("Summary: 0 found, 0 missing.", report_text)

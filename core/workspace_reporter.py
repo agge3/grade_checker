@@ -379,6 +379,9 @@ class WorkspaceReporter:
         legacy_details = self._collect_legacy_details(
             build_root, metadata.get("student_files", metadata.get("files", []))
         )
+        workflow_flags = self._collect_workflow_flags(
+            metadata, teacher_files, replaced_files, runtime_output
+        )
         student_files = metadata.get("student_files", metadata.get("files", []))
         criteria: list[CriterionResult] = [
             {
@@ -442,7 +445,109 @@ class WorkspaceReporter:
             "runtime_log": runtime_log,
             "criteria": criteria,
             "legacy_details": legacy_details,
+            "workflow_flags": workflow_flags,
         }
+
+    def _collect_workflow_flags(
+        self,
+        metadata: dict[str, object],
+        teacher_files: list[str],
+        replaced_files: list[str],
+        runtime_output: str,
+    ) -> dict[str, object]:
+        """Collect workflow-required provenance and review flags.
+
+        :param metadata: Submission metadata loaded from disk.
+        :param teacher_files: Template files copied into the build workspace.
+        :param replaced_files: Template files overlaid by student files.
+        :param runtime_output: Captured student program output.
+        :return: Serializable workflow flags for the human-readable report.
+        """
+        original_filename = str(metadata.get("original_filename", ""))
+        warnings = metadata.get("warnings", [])
+        if not isinstance(warnings, list):
+            warnings = [str(warnings)]
+        teacher_metadata = self.workspace / "references" / "teacher_metadata.json"
+        ignored_template_files = 0
+        if teacher_metadata.is_file():
+            imported = json.loads(teacher_metadata.read_text(encoding="utf-8"))
+            ignored = imported.get("ignored_template_files", [])
+            ignored_template_files = len(ignored) if isinstance(ignored, list) else 0
+        flags: dict[str, object] = {}
+        if metadata.get("recovered_from_archive"):
+            flags["Recovered from submitted archive"] = True
+        if "[LATE]" in original_filename:
+            flags["Original filename contains [LATE]"] = True
+        if warnings:
+            flags["Submission warnings"] = [str(warning) for warning in warnings]
+        if not teacher_files:
+            flags["Template provenance"] = "No teacher template files were imported."
+        if ignored_template_files:
+            flags["Ignored template files"] = ignored_template_files
+        if replaced_files:
+            flags["Student files replacing template files"] = replaced_files
+        mismatches = self._configuration_mismatches(metadata, teacher_files)
+        if mismatches:
+            flags["Configuration mismatches"] = mismatches
+        expected_output = self._check_expected_output(runtime_output)
+        if not expected_output.startswith("pass:"):
+            flags["Expected output"] = expected_output
+        if self.code_analyzer_path is None:
+            flags["Similarity analysis"] = "Not run; no CodeAnalyzer was configured."
+        return flags
+
+    def _configuration_mismatches(
+        self, metadata: dict[str, object], teacher_files: list[str]
+    ) -> list[str]:
+        """Identify likely differences between rules and imported materials.
+
+        :param metadata: Submission metadata containing required file names.
+        :param teacher_files: Files extracted from the teacher template.
+        :return: Specific configuration warnings requiring TA review.
+        """
+        mismatches: list[str] = []
+        configuration = self._load_rule_configuration()
+        if configuration == {} and self.rule_configuration != "workspace metadata":
+            mismatches.append(
+                f"Configuration could not be loaded: {self.rule_configuration}"
+            )
+        if not teacher_files:
+            mismatches.append("No teacher template files were imported.")
+        return mismatches
+
+    def _check_expected_output(self, runtime_output: str) -> str:
+        """Compare runtime output with an imported expected-output reference.
+
+        :param runtime_output: Captured output from the student executable.
+        :return: Comparison status and evidence for the report.
+        """
+        if runtime_output.startswith("Runtime skipped"):
+            return "Skipped; runtime did not execute."
+        references = self.workspace / "references" / "teacher"
+        candidates = sorted(
+            path for path in references.rglob("*")
+            if path.is_file()
+            and "output" in path.name.lower()
+            and path.suffix.lower() in {".txt", ".log", ".out"}
+        ) if references.is_dir() else []
+        if not candidates:
+            return "Not run; no expected-output reference was imported."
+        expected = candidates[0].read_text(encoding="utf-8", errors="replace")
+        status = (
+            "pass"
+            if self._normalize_output(runtime_output) == self._normalize_output(expected)
+            else "fail"
+        )
+        return f"{status}: compared with {candidates[0].name}."
+
+    @staticmethod
+    def _normalize_output(value: str) -> str:
+        """Normalize line endings and trailing whitespace for output checks.
+
+        :param value: Program or reference output to normalize.
+        :return: Comparable output text.
+        """
+        return "\n".join(line.rstrip() for line in value.strip().splitlines())
 
     def _collect_legacy_details(
         self, build_root: Path, student_files_value: object
@@ -805,6 +910,8 @@ class WorkspaceReporter:
         assert isinstance(criteria, list)
         legacy_details = outcome["legacy_details"]
         assert isinstance(legacy_details, dict)
+        workflow_flags = outcome["workflow_flags"]
+        assert isinstance(workflow_flags, dict)
         lines = [
             "Submission report", "=================",
             f"Workspace path prefix: {outcome['workspace_root']}",
@@ -822,6 +929,14 @@ class WorkspaceReporter:
                 f"[{criterion['status']}] {criterion['id']} "
                 f"(automated={criterion['automated']}): {criterion['evidence']}"
             )
+        if workflow_flags:
+            lines.extend(["", "Workflow Flags", "--------------"])
+            for label, value in workflow_flags.items():
+                if isinstance(value, list):
+                    lines.append(f"{label}:")
+                    lines.extend(f"- {item}" for item in value)
+                else:
+                    lines.append(f"{label}: {value}")
         lines.extend(["", "File Headers", "------------"])
         headers = legacy_details["headers"]
         assert isinstance(headers, list)
