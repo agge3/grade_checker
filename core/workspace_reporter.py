@@ -263,8 +263,10 @@ class WorkspaceReporter:
         ]
         table_rows = [
             [
-                str(row["submission"]), str(row["submission_status"]),
-                str(row["build_status"]), str(row["runtime_status"]),
+                str(row["submission"]),
+                self._summary_status(str(row["submission_status"])),
+                self._summary_status(str(row["build_status"])),
+                self._summary_status(str(row["runtime_status"])),
                 str(row["methods_found"]), str(row["required_files_found"]),
                 str(row["method_headers_found"]),
             ]
@@ -289,6 +291,18 @@ class WorkspaceReporter:
             *(format_row(row) for row in table_rows),
         ]
         return "\n".join(lines) + "\n"
+
+    @staticmethod
+    def _summary_status(status: str) -> str:
+        """Add a portable colored indicator to a Markdown status value.
+
+        :param status: Grading status to display in the summary table.
+        :return: Status prefixed with a colored Unicode indicator.
+        """
+        indicator = {
+            "pass": "✅", "fail": "❌", "warning": "⚠️", "skipped": "⚠️",
+        }.get(status, "ℹ️")
+        return f"{indicator} {status}"
 
     def _display_workspace_path(self, path: Path) -> str:
         """Render a workspace path relative to the reported workspace root.
