@@ -14,6 +14,8 @@ import sys
 from collections.abc import Sequence
 from typing import Callable, Mapping, TypedDict
 
+from core.similarity import SimilarityAnalyzer
+
 
 class CriterionResult(TypedDict):
     """Describe the result and evidence for one report criterion."""
@@ -46,6 +48,8 @@ class WorkspaceReporter:
         self.workspace = Path(workspace).expanduser()
         self.runtime_timeout = runtime_timeout
         self.rule_configuration = "workspace metadata"
+        self.code_analyzer_path: Path | None = None
+        self.disable_code_analyzer = False
 
     def report(
         self, submission: str | Sequence[str] | None = None
@@ -74,6 +78,13 @@ class WorkspaceReporter:
             or workspace_metadata.get("milestone")
             or "workspace metadata"
         )
+        configured_analyzer = workspace_metadata.get("code_analyzer")
+        if isinstance(configured_analyzer, str) and configured_analyzer:
+            self.code_analyzer_path = Path(configured_analyzer).expanduser()
+        elif not self.disable_code_analyzer and self.code_analyzer_path is None:
+            self.code_analyzer_path = self._find_repository_analyzer()
+            if self.code_analyzer_path is not None:
+                print(f"Default CodeAnalyzer found at: {self.code_analyzer_path}")
         reports_root = self.workspace / "reports"
         reports_root.mkdir(parents=True, exist_ok=True)
         local_now = datetime.now().astimezone().replace(microsecond=0)
@@ -164,7 +175,9 @@ class WorkspaceReporter:
 
         summary = reports_root / "summary.md"
         summary.write_text(self._write_summary(summary_rows, run_time), encoding="utf-8")
-        similarity_report = self._write_similarity_report(reports_root, run_time)
+        similarity_report = self._write_similarity_report(
+            reports_root, submissions_root, run_time
+        )
         return WorkspaceReportResult(
             self.workspace, tuple(reports), summary, similarity_report
         )
@@ -180,6 +193,25 @@ class WorkspaceReporter:
         if not isinstance(student_files, list) or not student_files:
             return "missing"
         return "warning" if metadata.get("warnings") else "pass"
+
+    @staticmethod
+    def _find_repository_analyzer() -> Path | None:
+        """Find an optional CodeAnalyzer in the grader repository root.
+
+        :return: Existing analyzer directory or source path, or ``None`` when
+            the optional analyzer is not installed.
+        """
+        repository_root = Path(__file__).resolve().parents[1]
+        candidates = (
+            repository_root / "CodeAnalyzer",
+            repository_root / "CodeAnalyzer.cpp",
+        )
+        for candidate in candidates:
+            if candidate.is_dir() and (candidate / "CodeAnalyzer.cpp").is_file():
+                return candidate
+            if candidate.is_file():
+                return candidate
+        return None
 
     @staticmethod
     def _required_files_found(metadata: dict[str, object]) -> int:
@@ -844,7 +876,9 @@ class WorkspaceReporter:
         except ValueError:
             return str(path)
 
-    def _write_similarity_report(self, reports_root: Path, run_time: str) -> Path:
+    def _write_similarity_report(
+        self, reports_root: Path, submissions_root: Path, run_time: str
+    ) -> Path:
         """Write a separate cohort similarity-analysis status report.
 
         :param reports_root: Workspace report output directory.
@@ -852,11 +886,27 @@ class WorkspaceReporter:
         :return: Similarity report path.
         """
         path = reports_root / "similarity-report.txt"
-        path.write_text(
-            "Similarity report\n=================\n"
-            f"Ran at: {run_time}\nStatus: not run\n"
-            "Reason: no instructor-provided CodeAnalyzer was found in this workspace.\n"
-            "No similarity score or academic-integrity finding was assigned.\n",
-            encoding="utf-8",
-        )
+        if self.code_analyzer_path is None:
+            content = (
+                "Similarity report\n=================\n"
+                f"Ran at: {run_time}\nStatus: not run\n"
+                "Reason: no CodeAnalyzer path was configured.\n"
+                "No similarity score or academic-integrity finding was assigned.\n"
+            )
+        else:
+            try:
+                analyzer = SimilarityAnalyzer(self.code_analyzer_path)
+                content = (
+                    "Similarity report\n=================\n"
+                    f"Ran at: {run_time}\nStatus: complete\n"
+                    + analyzer.run(submissions_root, path)
+                )
+            except (FileNotFoundError, RuntimeError, ValueError) as error:
+                content = (
+                    "Similarity report\n=================\n"
+                    f"Ran at: {run_time}\nStatus: failed\n"
+                    f"Reason: {error}\n"
+                    "No similarity score or academic-integrity finding was assigned.\n"
+                )
+        path.write_text(content, encoding="utf-8")
         return path

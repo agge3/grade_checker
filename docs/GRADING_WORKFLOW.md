@@ -273,6 +273,16 @@ student submission source-code similarities. Its source files and behavior are
 external inputs and must remain unchanged. The analyzer's output is evidence
 for the TA, not a point calculation or automatic academic-integrity finding.
 
+The explicit reporting command accepts the analyzer directory or
+`CodeAnalyzer.cpp` through `--code-analyzer`. The reporter compiles the source
+as C++20 and runs it from a temporary staging directory containing a generated
+configuration file. This accommodates the supplied analyzer's hard-coded
+configuration filename without changing the analyzer source.
+When no explicit path is supplied, the reporter checks the grader repository
+root for `CodeAnalyzer/CodeAnalyzer.cpp` or `CodeAnalyzer.cpp`. If neither
+exists, it records that similarity analysis was not run and continues reporting
+the submissions.
+
 Similarity analysis must use a student-only submissions area separate from the
 normalized build workspaces. A suitable workspace layout is:
 

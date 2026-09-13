@@ -11,6 +11,7 @@ import config
 from tools import util
 
 import argparse
+import os
 import re
 import shlex
 import sys
@@ -622,7 +623,53 @@ def _report_parser() -> argparse.ArgumentParser:
         action="append",
         help="Report one or more normalized submission identifiers; repeat the option",
     )
+    parser.add_argument(
+        "--code-analyzer",
+        help="CodeAnalyzer.cpp or its containing directory",
+    )
     return parser
+
+
+def _select_code_analyzer_interactively(
+    default: Path | None, workspace: Path
+) -> Path | None:
+    """Ask whether an interactive report should run CodeAnalyzer.
+
+    :param default: Analyzer discovered in the grader repository, if present.
+    :param workspace: Workspace root used for consistent path display.
+    :return: Selected analyzer path, or ``None`` to skip similarity analysis.
+    """
+    choices = []
+    default_choice = "Use default CodeAnalyzer"
+    if default is not None:
+        display_path = _display_workspace_path(workspace, default)
+        default_choice = f"Use default CodeAnalyzer ({display_path})"
+        choices.append(default_choice)
+    choices.extend(("Specify a custom CodeAnalyzer path", "Skip similarity analysis"))
+    try:
+        import questionary
+    except ImportError:
+        questionary = None
+    if questionary is not None:
+        choice = questionary.select(
+            "Similarity analyzer:", choices=choices, default=choices[0]
+        ).ask()
+    else:
+        print("Similarity analyzer options:")
+        for index, choice_text in enumerate(choices, start=1):
+            print(f"  {index}. {choice_text}")
+        choice = choices[int(input("Choose an option: ").strip() or "1") - 1]
+    if choice == default_choice:
+        return default
+    if choice == "Specify a custom CodeAnalyzer path":
+        if questionary is not None:
+            value = questionary.path("CodeAnalyzer path:").ask()
+        else:
+            value = input("CodeAnalyzer path: ").strip()
+        if not value:
+            raise ValueError("A custom CodeAnalyzer path is required.")
+        return Path(value).expanduser()
+    return None
 
 
 def report(arguments: Sequence[str]) -> int:
@@ -641,7 +688,15 @@ def report(arguments: Sequence[str]) -> int:
     submission = args.submission
     if submission is None and interactive_workspace:
         submission = _select_submission_interactively(workspace)
-    result = WorkspaceReporter(workspace).report(submission=submission)
+    reporter = WorkspaceReporter(workspace)
+    if args.code_analyzer:
+        reporter.code_analyzer_path = Path(args.code_analyzer).expanduser()
+    elif interactive_workspace:
+        reporter.code_analyzer_path = _select_code_analyzer_interactively(
+            WorkspaceReporter._find_repository_analyzer(), Path(workspace)
+        )
+        reporter.disable_code_analyzer = reporter.code_analyzer_path is None
+    result = reporter.report(submission=submission)
     _print_workspace_report_result(result)
     return 0
 
@@ -667,12 +722,11 @@ def _display_workspace_path(workspace: Path, path: Path) -> str:
 
     :param workspace: Absolute workspace root printed as the path prefix.
     :param path: Path inside the workspace to render.
-    :return: Workspace-relative path with a ``<workspace-path>/`` hint.
+    :return: Path rendered relative to the workspace with a
+        ``<workspace-path>/`` hint.
     """
-    try:
-        return f"<workspace-path>/{path.relative_to(workspace).as_posix()}"
-    except ValueError:
-        return str(path)
+    relative = Path(os.path.relpath(path, workspace)).as_posix()
+    return f"<workspace-path>/{relative}"
 
 
 def _run_report(milestone: str, cfg: config.Config) -> None:

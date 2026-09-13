@@ -163,6 +163,17 @@ When `report` is run without `--workspace`, the interactive workflow asks
 whether to report all submissions or select one or more from the workspace.
 Reporting all submissions is the default.
 
+The reporter first looks for an optional `CodeAnalyzer/CodeAnalyzer.cpp` or
+`CodeAnalyzer.cpp` in the root of the grader repository. If it is not present,
+similarity analysis is recorded as not run. An explicit path can also be
+provided:
+
+```bash
+python3 main.py report \
+  --workspace grading-workspaces/milestone2 \
+  --code-analyzer /path/to/CodeAnalyzer
+```
+
 Each submission report directory includes a guided `notes.md` for TA-written
 observations. The generated `report.txt` contains automated findings and
 evidence, including file-header, configured-method, and method-documentation details, GTest/extra-credit

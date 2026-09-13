@@ -7,6 +7,7 @@ from tests.unit import build_unit
 from tests.unit import file_processor_unit
 from tests.unit import grader_unit
 from tests.unit import main_unit
+from tests.unit import similarity_unit
 
 import unittest
 from unittest.mock import patch, MagicMock
@@ -27,6 +28,7 @@ def main():
     suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(file_processor_unit))
     suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(grader_unit))
     suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(main_unit))
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(similarity_unit))
 
     # Run test suite.
     runner = unittest.TextTestRunner(verbosity=2)

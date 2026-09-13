@@ -109,6 +109,15 @@ The supported flags are independent and may be combined:
    instructor files, builds and runs submissions, parses milestone-specific
    output, performs source checks, and writes one text report per repository.
 
+The explicit workspace reporting command also accepts `--code-analyzer`. It
+compiles and runs the unchanged instructor `CodeAnalyzer.cpp` from a temporary
+staging directory, supplying its hard-coded JSON filename with workspace-local
+`inputRoot` and output values. The resulting report is preserved under
+`reports/similarity-report.txt`.
+Without an explicit path, the reporter checks the repository root for an
+optional `CodeAnalyzer/CodeAnalyzer.cpp` or `CodeAnalyzer.cpp`; absence of both
+leaves similarity analysis marked as not run.
+
 ## Configuration model
 
 `core.workspace.create_workspace()` owns workspace initialization and writes
