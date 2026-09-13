@@ -163,7 +163,7 @@ Reporting all submissions is the default.
 
 Each submission report directory includes a guided `notes.md` for TA-written
 observations. The generated `report.txt` contains automated findings and
-evidence, including file-header and configured-method details, GTest/extra-credit
+evidence, including file-header, configured-method, and method-documentation details, GTest/extra-credit
 configuration status, and output-check status. Full build and runtime output
 remain available in the linked log files.
 Manual notes should go in `notes.md`, while structured corrections belong in

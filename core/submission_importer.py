@@ -66,7 +66,8 @@ class SubmissionImporter:
         self.output_root.mkdir(parents=True, exist_ok=True)
         raw_archive = self.output_root / "raw" / self.archive_path.name
         raw_archive.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(self.archive_path, raw_archive)
+        if self.archive_path.resolve() != raw_archive.resolve():
+            shutil.copy2(self.archive_path, raw_archive)
 
         try:
             with ZipFile(self.archive_path) as archive:
@@ -236,9 +237,12 @@ class SubmissionImporter:
             expected_names = [self.required_filename, *self.optional_filenames]
             for expected_name in expected_names:
                 expected = Path(expected_name).name
-                if filename.lower() == expected.lower() or filename.lower().endswith(
-                    ("_" + expected).lower()
-                ):
+                filename_stem = Path(filename).stem
+                expected_stem = Path(expected).stem
+                suffix_pattern = (
+                    rf"(?:^|[-_ ]){re.escape(expected_stem)}(?:-\d+)?$"
+                )
+                if re.search(suffix_pattern, filename_stem, re.IGNORECASE):
                     return expected
         return filename
 

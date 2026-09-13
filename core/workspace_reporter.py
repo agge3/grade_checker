@@ -196,7 +196,9 @@ class WorkspaceReporter:
         update_status("running")
         runtime_status, runtime_output = self._run(build_root, executable, build_status)
         runtime_log.write_text(runtime_output, encoding="utf-8")
-        legacy_details = self._collect_legacy_details(build_root)
+        legacy_details = self._collect_legacy_details(
+            build_root, metadata.get("student_files", metadata.get("files", []))
+        )
         student_files = metadata.get("student_files", metadata.get("files", []))
         criteria: list[CriterionResult] = [
             {
@@ -263,11 +265,13 @@ class WorkspaceReporter:
         }
 
     def _collect_legacy_details(
-        self, build_root: Path
+        self, build_root: Path, student_files_value: object
     ) -> dict[str, object]:
         """Collect the detailed sections from the legacy report style.
 
         :param build_root: Prepared source tree for one submission.
+        :param student_files_value: Student-provided file names from submission
+            metadata; only these files are checked for headers and methods.
         :return: Serializable header, method, and check details.
         """
         configuration = self._load_rule_configuration()
@@ -277,34 +281,57 @@ class WorkspaceReporter:
             and path.suffix.lower() in {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp"}
             and "build" not in path.parts
         )
+        student_files = (
+            {name for name in student_files_value if isinstance(name, str)}
+            if isinstance(student_files_value, list)
+            else set()
+        )
+        student_source_files = [
+            path for path in source_files
+            if path.relative_to(build_root).as_posix() in student_files
+            or path.name in student_files
+        ]
         headers: list[str] = []
-        for source_file in source_files:
-            source_lines = source_file.read_text(
-                encoding="utf-8", errors="replace"
-            ).splitlines()
-            first_nonempty = next((line.strip() for line in source_lines if line.strip()), "")
-            status = "FOUND" if first_nonempty.startswith(("//", "/*", "*")) else "MISSING"
-            headers.append(
-                f"{status} header comment: {source_file.relative_to(build_root)}"
-            )
+        for source_file in student_source_files:
+            header_content = self._file_header_content(source_file)
+            relative_path = source_file.relative_to(build_root)
+            if header_content is None:
+                headers.append(f"MISSING header comment: {relative_path}")
+            else:
+                headers.append(
+                    f"FOUND header comment: {relative_path}\n{header_content}"
+                )
 
         methods: dict[str, list[str]] = {}
+        method_headers: dict[str, list[str]] = {}
         configured_methods = configuration.get("methods", {})
         source_text = "\n".join(
-            path.read_text(encoding="utf-8", errors="replace") for path in source_files
+            path.read_text(encoding="utf-8", errors="replace")
+            for path in student_source_files
         )
         if isinstance(configured_methods, Mapping):
             for clazz, class_methods in configured_methods.items():
                 if not isinstance(clazz, str) or not isinstance(class_methods, Mapping):
                     continue
                 results: list[str] = []
+                header_results: list[str] = []
                 for method_name in class_methods:
                     if not isinstance(method_name, str):
                         continue
                     qualified = f"{clazz}::{method_name}"
                     status = "FOUND" if qualified in source_text else "MISSING"
                     results.append(f"{status}: {qualified}")
+                    header_content = self._method_header_content(
+                        student_source_files, clazz, method_name
+                    )
+                    if header_content is None:
+                        header_results.append(f"MISSING method header: {qualified}")
+                    else:
+                        header_results.append(
+                            f"FOUND method header: {qualified}\n{header_content}"
+                        )
                 methods[clazz] = results
+                method_headers[clazz] = header_results
 
         extra_credit = configuration.get("extra_credit", {})
         if isinstance(extra_credit, Mapping) and extra_credit.get("enabled"):
@@ -323,6 +350,9 @@ class WorkspaceReporter:
         return {
             "headers": headers or ["No C/C++ source files found."],
             "methods": methods or {"(no configured methods)": ["Needs manual review."]},
+            "method_headers": method_headers or {
+                "(no configured methods)": ["Needs manual review."]
+            },
             "gtest_check": gtest_check,
             "output_check": output_check,
         }
@@ -346,6 +376,86 @@ class WorkspaceReporter:
             return {}
         configuration = json.loads(path.read_text(encoding="utf-8"))
         return configuration if isinstance(configuration, dict) else {}
+
+    @staticmethod
+    def _method_header_content(
+        source_files: list[Path], clazz: str, method_name: str
+    ) -> str | None:
+        """Return the preceding documentation for a method implementation.
+
+        :param source_files: C/C++ source files to inspect.
+        :param clazz: Class containing the configured method.
+        :param method_name: Method name to locate.
+        :return: Comment content when a matching implementation is documented,
+            otherwise ``None``.
+        """
+        pattern = re.compile(
+            rf"\b(?:{re.escape(clazz)}\s*::\s*)?{re.escape(method_name)}\s*\("
+        )
+        for source_file in source_files:
+            lines = source_file.read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines()
+            for index, line in enumerate(lines):
+                if not pattern.search(line):
+                    continue
+                previous = index - 1
+                while previous >= 0 and not lines[previous].strip():
+                    previous -= 1
+                if previous < 0:
+                    continue
+                if lines[previous].strip().startswith("//"):
+                    return lines[previous].strip()
+                if "*/" in lines[previous]:
+                    comment_lines = [lines[previous].strip()]
+                    cursor = previous - 1
+                    while cursor >= 0:
+                        comment_lines.append(lines[cursor].strip())
+                        if "/*" in lines[cursor]:
+                            break
+                        cursor -= 1
+                    return "\n".join(reversed(comment_lines))
+                if lines[previous].strip().startswith("*"):
+                    comment_lines = [lines[previous].strip()]
+                    cursor = previous - 1
+                    while cursor >= 0:
+                        comment_lines.append(lines[cursor].strip())
+                        if "/*" in lines[cursor]:
+                            break
+                        cursor -= 1
+                    return "\n".join(reversed(comment_lines))
+        return None
+
+    @staticmethod
+    def _file_header_content(source_file: Path) -> str | None:
+        """Return the leading documentation comment from a source file.
+
+        :param source_file: C or C++ source file to inspect.
+        :return: Preserved multiline header comment, or ``None`` when the file
+            has no leading comment.
+        """
+        lines = source_file.read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines()
+        first = next((index for index, line in enumerate(lines) if line.strip()), None)
+        if first is None:
+            return None
+        first_line = lines[first].strip()
+        if first_line.startswith("//"):
+            comment_lines: list[str] = []
+            for line in lines[first:]:
+                if not line.strip().startswith("//"):
+                    break
+                comment_lines.append(line.strip())
+            return "\n".join(comment_lines)
+        if first_line.startswith("/*"):
+            comment_lines = []
+            for line in lines[first:]:
+                comment_lines.append(line.strip())
+                if "*/" in line:
+                    return "\n".join(comment_lines)
+            return None
+        return None
 
     @staticmethod
     def _initialize_notes(notes_path: Path) -> None:
@@ -524,7 +634,9 @@ class WorkspaceReporter:
         headers = legacy_details["headers"]
         assert isinstance(headers, list)
         for index, item in enumerate(headers, start=1):
-            lines.append(f"{index}. {item}")
+            item_lines = str(item).splitlines()
+            lines.append(f"{index}. {item_lines[0]}")
+            lines.extend(f"     {line}" for line in item_lines[1:])
         header_found = sum(str(item).startswith("FOUND") for item in headers)
         header_missing = sum(str(item).startswith("MISSING") for item in headers)
         lines.append(
@@ -542,6 +654,26 @@ class WorkspaceReporter:
                 for index, result in enumerate(method_results, start=1)
             )
             lines.append(f"  Summary: {found} found, {missing} missing.")
+        lines.extend(["", "Method Headers", "---------------"])
+        method_headers = legacy_details["method_headers"]
+        assert isinstance(method_headers, dict)
+        all_header_results: list[object] = []
+        for clazz, header_results in method_headers.items():
+            lines.append(f"{clazz}:")
+            all_header_results.extend(header_results)
+            for index, result in enumerate(header_results, start=1):
+                result_lines = str(result).splitlines()
+                lines.append(f"  {index}. {result_lines[0]}")
+                lines.extend(f"     {line}" for line in result_lines[1:])
+            found = sum(str(result).startswith("FOUND") for result in header_results)
+            missing = sum(str(result).startswith("MISSING") for result in header_results)
+            lines.append(f"  Summary: {found} found, {missing} missing.")
+        header_found = sum(str(result).startswith("FOUND") for result in all_header_results)
+        header_missing = sum(str(result).startswith("MISSING") for result in all_header_results)
+        lines.append(
+            f"Overall method-header summary: {header_found} found, "
+            f"{header_missing} missing."
+        )
         lines.extend([
             "", "GTest Check", "-----------", str(legacy_details["gtest_check"]),
             "", "Output Check", "------------", str(legacy_details["output_check"]),
