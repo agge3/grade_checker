@@ -159,6 +159,18 @@ python3 main.py report \
 
 Repeat `--submission` to report a selected group of submissions.
 
+To create a directory of convenient symlinks to the generated reports:
+
+```bash
+python3 main.py generate-index-report \
+  --workspace grading-workspaces/milestone2
+```
+
+This creates `report-index/` by default, with one link per submission report
+plus links to `summary.md` and `similarity-report.txt` when those files exist.
+Links are relative, so the workspace can be moved. Re-running the command
+refreshes existing symlinks and does not overwrite real files.
+
 When `report` is run without `--workspace`, the interactive workflow asks
 whether to report all submissions or select one or more from the workspace.
 Reporting all submissions is the default.

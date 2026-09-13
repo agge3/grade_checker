@@ -84,6 +84,13 @@ workspace workflow. The
 legacy `<milestone> --report` flag remains a compatibility path for repository
 reporting and does not use the workspace workflow.
 
+The `generate-index-report` command calls
+`core.report_index.create_report_index()` to
+create relative symlinks under `<workspace>/report-index` for each
+`reports/<submission>/report.txt`, plus the workspace summary and similarity
+report when present. Existing symlinks are refreshed; real files are never
+overwritten.
+
 `load_config()` validates the JSON and returns a `Config` object. `Config`
 implements the mapping interface, so existing consumers can use expressions
 such as `cfg["options"]["build"]`. The typed `cfg.data` property exposes the

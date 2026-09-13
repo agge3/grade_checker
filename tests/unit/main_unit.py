@@ -1,6 +1,7 @@
 """Tests for the command-line orchestration layer."""
 
 from pathlib import Path
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -74,6 +75,14 @@ class TeacherImportTests(unittest.TestCase):
         self.assertEqual(main.main(["report", "milestone2-hugh"]), 0)
         report.assert_called_once_with(["milestone2-hugh"])
 
+    @patch("main.report_index", return_value=0)
+    def test_main_dispatches_generate_index_report_command(self, report_index) -> None:
+        """Ensure the generate-index-report command reaches its handler."""
+        self.assertEqual(
+            main.main(["generate-index-report", "--workspace", "workspace"]), 0
+        )
+        report_index.assert_called_once_with(["--workspace", "workspace"])
+
 
 class WorkspaceReportTests(unittest.TestCase):
     """Verify reporting prepares isolated teacher-template build workspaces."""
@@ -129,6 +138,52 @@ class WorkspaceReportTests(unittest.TestCase):
             notes = workspace / "reports" / result.submissions[0].identifier / "notes.md"
             notes_text = notes.read_text(encoding="utf-8")
             self.assertIn("different from `report.txt`", notes_text)
+
+
+class ReportIndexTests(unittest.TestCase):
+    """Verify report indexes expose generated reports without copying them."""
+
+    def test_report_index_creates_relative_links_and_refreshes_stale_links(self) -> None:
+        """Ensure report links point into the workspace and stale links disappear."""
+        from core.report_index import create_report_index
+
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "workspace"
+            reports = workspace / "reports"
+            reports.mkdir(parents=True)
+            (workspace / "workspace.json").write_text("{}", encoding="utf-8")
+            student_report = reports / "student01" / "report.txt"
+            student_report.parent.mkdir()
+            student_report.write_text("grade", encoding="utf-8")
+            (reports / "summary.md").write_text("summary", encoding="utf-8")
+            index = create_report_index(workspace).directory
+
+            self.assertEqual(
+                (index / "student01").read_text(encoding="utf-8"), "grade"
+            )
+            self.assertEqual(os.readlink(index / "student01"), "../reports/student01/report.txt")
+            self.assertTrue((index / "summary.md").is_symlink())
+
+            student_report.unlink()
+            create_report_index(workspace)
+            self.assertFalse((index / "student01").exists())
+
+    def test_report_index_does_not_overwrite_real_entries(self) -> None:
+        """Ensure an existing real index entry causes a clear failure."""
+        from core.report_index import create_report_index
+
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "workspace"
+            report = workspace / "reports" / "student01" / "report.txt"
+            report.parent.mkdir(parents=True)
+            (workspace / "workspace.json").write_text("{}", encoding="utf-8")
+            report.write_text("grade", encoding="utf-8")
+            index = workspace / "report-index"
+            index.mkdir()
+            (index / "student01").write_text("keep", encoding="utf-8")
+
+            with self.assertRaises(FileExistsError):
+                create_report_index(workspace)
 
 
 if __name__ == "__main__":

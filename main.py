@@ -22,6 +22,7 @@ from core.workspace import Workspace, create_workspace as initialize_workspace
 from core.submission_importer import ImportResult, SubmissionImporter
 from core.teacher_importer import TeacherImportResult, TeacherImporter
 from core.workspace_reporter import WorkspaceReportResult, WorkspaceReporter
+from core.report_index import create_report_index
 
 # Grade HashTable.
 def grade_hash_table():
@@ -630,6 +631,40 @@ def _report_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _report_index_parser() -> argparse.ArgumentParser:
+    """Build the parser for the generate-index-report command.
+
+    :return: Parser describing generate-index-report options.
+    """
+    parser = argparse.ArgumentParser(
+        prog="Grade Checker generate-index-report",
+        description="Create a symlink index for reports in a grading workspace.",
+    )
+    parser.add_argument(
+        "--workspace",
+        required=True,
+        help="Initialized grading workspace directory",
+    )
+    parser.add_argument(
+        "--output",
+        help="Index directory; defaults to <workspace>/report-index",
+    )
+    return parser
+
+
+def report_index(arguments: Sequence[str]) -> int:
+    """Create a symlink index for all reports in a grading workspace.
+
+    :param arguments: Arguments following ``generate-index-report``.
+    :return: Zero after the index is created.
+    """
+    args = _report_index_parser().parse_args(list(arguments))
+    result = create_report_index(args.workspace, args.output)
+    print(f"Report index: {result.directory}")
+    print(f"Report links created: {len(result.links)}")
+    return 0
+
+
 def _select_code_analyzer_interactively(
     default: Path | None, workspace: Path
 ) -> Path | None:
@@ -762,6 +797,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return import_teacher_zip(command_arguments[1:])
     if command_arguments and command_arguments[0] == "report":
         return report(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "generate-index-report":
+        return report_index(command_arguments[1:])
 
     parser = argparse.ArgumentParser(
             prog = "Grade Checker"
