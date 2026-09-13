@@ -5,10 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 from collections.abc import Sequence
 from typing import Callable, Mapping, TypedDict
 
@@ -123,7 +125,8 @@ class WorkspaceReporter:
                         progress line.
                     """
                     print(
-                        f"Reporting {index}/{total} {submission_root.name}: {status}",
+                        f"Reporting {index}/{total} {submission_root.name}: "
+                        f"{self._colorize(status, 'cyan')}",
                         end="\r",
                         flush=True,
                     )
@@ -153,9 +156,9 @@ class WorkspaceReporter:
                 })
                 print(
                     f"Reporting {index}/{total} {submission_root.name}: "
-                    f"build={outcome['build_status']} "
-                    f"runtime={outcome['runtime_status']} "
-                    f"report={self._display_workspace_path(report_path)}",
+                    f"build={self._colorize_status(str(outcome['build_status']))} "
+                    f"runtime={self._colorize_status(str(outcome['runtime_status']))} "
+                    f"report={self._colorize(self._display_workspace_path(report_path), 'blue')}",
                     flush=True,
                 )
 
@@ -266,6 +269,37 @@ class WorkspaceReporter:
             return f"<workspace-path>/{path.relative_to(self.workspace).as_posix()}"
         except ValueError:
             return str(path)
+
+    @staticmethod
+    def _colorize(text: str, color: str) -> str:
+        """Apply a terminal color when output is an interactive terminal.
+
+        :param text: Console text to format.
+        :param color: ANSI color name supported by this reporter.
+        :return: Colored text for interactive output, otherwise unchanged text.
+        """
+        if not os.environ.get("NO_COLOR") and sys.stdout.isatty():
+            colors = {
+                "red": "\033[31m", "green": "\033[32m", "yellow": "\033[33m",
+                "blue": "\033[34m", "cyan": "\033[36m",
+            }
+            prefix = colors.get(color)
+            if prefix:
+                return f"{prefix}{text}\033[0m"
+        return text
+
+    @classmethod
+    def _colorize_status(cls, status: str) -> str:
+        """Color a grading status according to its outcome.
+
+        :param status: Build or runtime status to display.
+        :return: Colorized status when supported by the terminal.
+        """
+        color = {
+            "pass": "green", "fail": "red", "warning": "yellow",
+            "skipped": "yellow", "manual_review": "yellow",
+        }.get(status, "cyan")
+        return cls._colorize(status, color)
 
     def _process_submission(
         self,
