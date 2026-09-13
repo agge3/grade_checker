@@ -21,5 +21,6 @@ png
 tmp
 **/*.DS_Store
 old
+CodeAnalyzer/
 
 .logs/**
