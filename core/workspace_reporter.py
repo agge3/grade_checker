@@ -89,6 +89,7 @@ class WorkspaceReporter:
         reports_root.mkdir(parents=True, exist_ok=True)
         local_now = datetime.now().astimezone().replace(microsecond=0)
         timezone_name = local_now.tzname() or "local"
+        run_id = local_now.strftime("%Y%m%d-%H%M%S")
         run_time = (
             f"{local_now.strftime('%Y-%m-%d %H:%M:%S')} ({timezone_name})"
         )
@@ -173,8 +174,42 @@ class WorkspaceReporter:
                     flush=True,
                 )
 
+        available_count = (
+            len([path for path in submissions_root.iterdir() if path.is_dir()])
+            if submissions_root.is_dir() else 0
+        )
+        state_path = reports_root / "summary-state.json"
+        state = self._load_summary_state(state_path)
+        cumulative_rows = self._merge_summary_rows(state.get("rows", []), summary_rows)
+        run_scope = "all" if not selected_submissions else "selected"
+        run_path = self._next_run_path(reports_root, run_id, run_scope)
+        history = state.get("history", [])
+        if not isinstance(history, list):
+            history = []
+        history.append({
+            "path": self._display_workspace_path(run_path),
+            "ran_at": run_time,
+            "submissions": [row["submission"] for row in summary_rows],
+        })
+        state_path.write_text(
+            json.dumps({"rows": cumulative_rows, "history": history}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        run_path.write_text(
+            self._write_summary(
+                summary_rows, run_time, "Reporting Run Summary",
+                len(summary_rows), available_count,
+            ),
+            encoding="utf-8",
+        )
         summary = reports_root / "summary.md"
-        summary.write_text(self._write_summary(summary_rows, run_time), encoding="utf-8")
+        summary.write_text(
+            self._write_summary(
+                cumulative_rows, run_time, "Grading Summary",
+                len(summary_rows), available_count, history,
+            ),
+            encoding="utf-8",
+        )
         similarity_report = self._write_similarity_report(
             reports_root, submissions_root, run_time
         )
@@ -246,12 +281,22 @@ class WorkspaceReporter:
         return len(student_files) if isinstance(student_files, list) else 0
 
     def _write_summary(
-        self, rows: list[dict[str, object]], run_time: str
+        self,
+        rows: list[dict[str, object]],
+        run_time: str,
+        title: str = "Grading Summary",
+        processed_count: int | None = None,
+        total_count: int | None = None,
+        history: list[object] | None = None,
     ) -> str:
         """Build the Markdown summary table for a reporting run.
 
         :param rows: Per-submission status and grading counts.
         :param run_time: Local timestamp for this reporting run.
+        :param title: Markdown heading for the summary document.
+        :param processed_count: Number of submissions processed in this run.
+        :param total_count: Total submissions known in the workspace.
+        :param history: Archived run records to link from the cumulative summary.
         :return: Markdown document content.
         """
         expected = rows[0] if rows else {}
@@ -283,14 +328,76 @@ class WorkspaceReporter:
             "-" * max(3, width) for width in widths
         ) + " |"
         lines = [
-            "# Grading Summary", "",
+            f"# {title}", "",
             f"Workspace path prefix: `{self.workspace}`  ",
             f"Ran at: {run_time}  ",
-            f"Submissions reported: {len(rows)}", "",
+            f"Submissions processed in this run: "
+            f"{processed_count if processed_count is not None else len(rows)}  ",
+            f"Total submissions in workspace: "
+            f"{total_count if total_count is not None else len(rows)}", "",
             format_row(headers), separator,
             *(format_row(row) for row in table_rows),
         ]
+        if history:
+            lines.extend(["", "## Run History", ""])
+            lines.extend(
+                f"- `{record['ran_at']}`: "
+                f"{self._display_workspace_path(self.workspace / record['path'].removeprefix('<workspace-path>/'))} "
+                f"({len(record['submissions'])} submissions)"
+                for record in history if isinstance(record, dict)
+            )
         return "\n".join(lines) + "\n"
+
+    @staticmethod
+    def _load_summary_state(state_path: Path) -> dict[str, object]:
+        """Load cumulative summary state without failing a reporting run.
+
+        :param state_path: JSON file storing cumulative summary rows and history.
+        :return: Existing state mapping, or an empty mapping.
+        """
+        if not state_path.is_file():
+            return {}
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return state if isinstance(state, dict) else {}
+
+    @staticmethod
+    def _merge_summary_rows(
+        previous: object, current: list[dict[str, object]]
+    ) -> list[dict[str, object]]:
+        """Merge newly reported rows into the cumulative submission table.
+
+        :param previous: Previously stored summary rows.
+        :param current: Rows produced by the current reporting command.
+        :return: One latest row per submission, sorted by identifier.
+        """
+        merged: dict[str, dict[str, object]] = {}
+        if isinstance(previous, list):
+            for row in previous:
+                if isinstance(row, dict) and isinstance(row.get("submission"), str):
+                    merged[row["submission"]] = row
+        for row in current:
+            merged[str(row["submission"])] = row
+        return [merged[name] for name in sorted(merged)]
+
+    def _next_run_path(self, reports_root: Path, run_id: str, scope: str) -> Path:
+        """Choose a unique path for an immutable per-run summary.
+
+        :param reports_root: Workspace report output directory.
+        :param run_id: Timestamp-based run identifier.
+        :param scope: ``all`` or ``selected`` run label.
+        :return: New Markdown run-summary path.
+        """
+        run_root = reports_root / "runs"
+        run_root.mkdir(parents=True, exist_ok=True)
+        candidate = run_root / f"{run_id}-{scope}.md"
+        suffix = 2
+        while candidate.exists():
+            candidate = run_root / f"{run_id}-{scope}-{suffix}.md"
+            suffix += 1
+        return candidate
 
     @staticmethod
     def _summary_status(status: str) -> str:

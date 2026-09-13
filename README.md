@@ -143,7 +143,9 @@ It selects an initialized workspace, prepares each submission's build
 workspace at report time, and writes per-submission reports plus
 `reports/summary.md`. The summary is a Markdown table containing submission,
 build, and runtime statuses plus method and required-file counts. For scripted
-runs, provide the workspace directly:
+runs, provide the workspace directly. Each reporting command also writes a
+submission-only snapshot under `reports/runs/`; the cumulative summary keeps
+the latest known row for every submission.
 
 ```bash
 python3 main.py report --workspace grading-workspaces/milestone2

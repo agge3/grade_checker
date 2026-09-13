@@ -312,6 +312,9 @@ workspace/
       build-output.log
       runtime-output.log
     similarity-report.txt
+    summary.md
+    runs/
+      2026-09-13-120001-selected.md
 ```
 
 `workspace/submissions/` is the normalized student-only view and can be passed
@@ -414,6 +417,9 @@ The workspace uses `reports/` as the output root. Each submission has its own
 directory containing `report.txt`, `build-output.log`, and
 `runtime-output.log`. The cohort-level `similarity-report.txt` is stored
 directly under `reports/` because it compares submissions with one another.
+The cumulative `summary.md` retains the latest known row for every submission;
+each Markdown file under `reports/runs/` contains only the submissions
+processed by that reporting invocation.
 
 Each report should include the rule/configuration version used for grading and
 the time the grading run occurred. Rule files should document their version

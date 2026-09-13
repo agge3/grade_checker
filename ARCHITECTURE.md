@@ -73,8 +73,10 @@ Reporting is exposed through the explicit `report` command. With no workspace
 argument it offers initialized workspaces through a keyboard-navigable
 selection prompt. `WorkspaceReporter` prepares each submission's build
 workspace at report time, overlays student files on the teacher template, and
-writes per-submission reports plus a Markdown workspace summary table under
-`reports/summary.md`. The
+writes per-submission reports plus a cumulative Markdown workspace summary
+table under `reports/summary.md`. Each invocation also writes a Markdown
+snapshot containing only the submissions processed by that invocation under
+`reports/runs/`. The
 report command can process all submissions or one or more normalized submission
 identifiers. Each
 submission report retains the legacy report sections (file headers, configured
