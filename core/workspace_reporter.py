@@ -471,6 +471,7 @@ class WorkspaceReporter:
         """
         report_root = self.workspace / "reports" / submission_root.name
         report_root.mkdir(parents=True, exist_ok=True)
+        self._link_submission_directory(report_root, submission_root)
         update_status("preparing build workspace")
         build_root, teacher_files, replaced_files = self._prepare_build_workspace(
             submission_root, metadata
@@ -554,6 +555,30 @@ class WorkspaceReporter:
             "legacy_details": legacy_details,
             "workflow_flags": workflow_flags,
         }
+
+    @staticmethod
+    def _link_submission_directory(report_root: Path, submission_root: Path) -> None:
+        """Expose the normalized submission from its report directory.
+
+        :param report_root: Per-submission directory containing generated
+            reports and review files.
+        :param submission_root: Student-only normalized submission directory.
+        :raises FileExistsError: If ``submission`` is an existing real file or
+            directory in the report directory.
+        :raises OSError: If an existing symlink cannot be removed or the new
+            symlink cannot be created.
+        """
+        link_path = report_root / "submission"
+        if link_path.is_symlink():
+            link_path.unlink()
+        elif link_path.exists():
+            raise FileExistsError(
+                f"Cannot replace existing report entry '{link_path}'."
+            )
+        link_path.symlink_to(
+            os.path.relpath(submission_root, start=report_root),
+            target_is_directory=True,
+        )
 
     def _collect_workflow_flags(
         self,

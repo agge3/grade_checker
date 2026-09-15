@@ -86,6 +86,10 @@ workspace workflow. The
 legacy `<milestone> --report` flag remains a compatibility path for repository
 reporting and does not use the workspace workflow.
 
+Each generated `reports/<submission>/` directory also contains the relative
+`submission` symlink, which points to that student's normalized directory under
+`submissions/`.
+
 The `generate-index-report` command calls
 `core.report_index.create_report_index()` to
 create relative symlinks under `<workspace>/report-index` for each

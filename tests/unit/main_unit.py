@@ -149,6 +149,12 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertEqual((build_workspace / "support.hpp").read_text(), "support")
             self.assertEqual((build_workspace / "student.cpp").read_text(), "student")
             self.assertEqual(len(report_result.reports), 1)
+            submission_link = workspace / "reports" / result.submissions[0].identifier / "submission"
+            self.assertTrue(submission_link.is_symlink())
+            self.assertEqual(os.readlink(submission_link), "../../submissions/student")
+            self.assertTrue(
+                os.path.samefile(submission_link, workspace / "submissions" / "student")
+            )
             self.assertEqual(report_result.summary.name, "summary.md")
             summary_text = report_result.summary.read_text(encoding="utf-8")
             self.assertIn("| Submission | Submission status |", summary_text)

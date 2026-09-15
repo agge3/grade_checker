@@ -147,6 +147,10 @@ runs, provide the workspace directly. Each reporting command also writes a
 submission-only snapshot under `reports/runs/`; the cumulative summary keeps
 the latest known row for every submission.
 
+Each `reports/<submission>/` directory also contains a relative `submission`
+directory symlink to the matching normalized student submission under
+`submissions/`.
+
 ```bash
 python3 main.py report --workspace grading-workspaces/milestone2
 ```
