@@ -118,6 +118,36 @@ class TeacherImportTests(unittest.TestCase):
 class WorkspaceReportTests(unittest.TestCase):
     """Verify reporting prepares isolated teacher-template build workspaces."""
 
+    def test_expected_output_classifies_exact_blank_line_and_content_differences(self) -> None:
+        """Classify runtime output against the TA reference by difference type."""
+        from core.workspace_reporter import WorkspaceReporter
+
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "workspace"
+            reference_root = workspace / "references/teacher"
+            reference_root.mkdir(parents=True)
+            (workspace / "workspace.json").write_text("{}", encoding="utf-8")
+            (reference_root / "expected-output.txt").write_text(
+                "first\nsecond\n", encoding="utf-8"
+            )
+            reporter = WorkspaceReporter(workspace)
+
+            self.assertTrue(
+                reporter._check_expected_output(
+                    "first\nsecond\n\n\n[exit status: 0]\n"
+                ).startswith("newline-only difference (")
+            )
+            self.assertTrue(
+                reporter._check_expected_output(
+                    "first\nsecond\n\n[exit status: 0]\n"
+                ).startswith("exact match (")
+            )
+            self.assertTrue(
+                reporter._check_expected_output(
+                    "first\nchanged\n[exit status: 0]\n"
+                ).startswith("manual review (1 differing line):")
+            )
+
     def test_report_overlays_teacher_template(self) -> None:
         """Ensure reporting creates build inputs without changing student import."""
         from core.submission_importer import SubmissionImporter

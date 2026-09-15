@@ -90,6 +90,11 @@ Each generated `reports/<submission>/` directory also contains the relative
 `submission` symlink, which points to that student's normalized directory under
 `submissions/`.
 
+Runtime stdout is compared with the first TA-provided output reference under
+`references/teacher/`. The result is recorded as an exact match, a
+blank-line-only difference, or a manual-review difference in each summary,
+along with the count of differing non-empty lines.
+
 The `generate-index-report` command calls
 `core.report_index.create_report_index()` to
 create relative symlinks under `<workspace>/report-index` for each

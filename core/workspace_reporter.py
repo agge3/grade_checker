@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import difflib
 import json
 import os
 from pathlib import Path
@@ -159,6 +160,8 @@ class WorkspaceReporter:
                     "submission_status": self._submission_status(metadata),
                     "build_status": outcome["build_status"],
                     "runtime_status": outcome["runtime_status"],
+                    "output_comparison": outcome["output_comparison"],
+                    "different_line_count": outcome["different_line_count"],
                     "methods_found": legacy_details["methods_found"],
                     "methods_expected": legacy_details["methods_expected"],
                     "required_files_found": self._required_files_found(metadata),
@@ -302,6 +305,8 @@ class WorkspaceReporter:
         expected = rows[0] if rows else {}
         headers = [
             "Submission", "Submission status", "Build status", "Runtime status",
+            "Output comparison",
+            "Differing lines",
             f"Methods found (expected: {expected.get('methods_expected', 0)})",
             f"Required files found (expected: {expected.get('required_files_expected', 0)})",
             f"Method headers found (expected: {expected.get('method_headers_expected', 0)})",
@@ -312,6 +317,9 @@ class WorkspaceReporter:
                 self._summary_status(str(row["submission_status"])),
                 self._summary_status(str(row["build_status"])),
                 self._summary_status(str(row["runtime_status"])),
+                self._summary_status(str(row.get("output_comparison", "not available"))),
+                str(row["different_line_count"])
+                if row.get("different_line_count") is not None else "n/a",
                 str(row["methods_found"]), str(row["required_files_found"]),
                 str(row["method_headers_found"]),
             ]
@@ -408,6 +416,8 @@ class WorkspaceReporter:
         """
         indicator = {
             "pass": "✅", "fail": "❌", "warning": "⚠️", "skipped": "⚠️",
+            "exact match": "✅", "newline-only difference": "✅",
+            "manual review": "⚠️",
         }.get(status, "ℹ️")
         return f"{indicator} {status}"
 
@@ -490,6 +500,9 @@ class WorkspaceReporter:
         workflow_flags = self._collect_workflow_flags(
             metadata, teacher_files, replaced_files, runtime_output
         )
+        expected_output = self._check_expected_output(runtime_output)
+        count_match = re.search(r"\((\d+) differing lines?\):", expected_output)
+        different_line_count = int(count_match.group(1)) if count_match else None
         student_files = metadata.get("student_files", metadata.get("files", []))
         criteria: list[CriterionResult] = [
             {
@@ -551,6 +564,8 @@ class WorkspaceReporter:
             "runtime_status": runtime_status,
             "build_log": build_log,
             "runtime_log": runtime_log,
+            "output_comparison": expected_output.split(" (", 1)[0].split(":", 1)[0],
+            "different_line_count": different_line_count,
             "criteria": criteria,
             "legacy_details": legacy_details,
             "workflow_flags": workflow_flags,
@@ -622,7 +637,7 @@ class WorkspaceReporter:
         if mismatches:
             flags["Configuration mismatches"] = mismatches
         expected_output = self._check_expected_output(runtime_output)
-        if not expected_output.startswith("pass:"):
+        if not expected_output.startswith("exact match "):
             flags["Expected output"] = expected_output
         if self.code_analyzer_path is None:
             flags["Similarity analysis"] = "Not run; no CodeAnalyzer was configured."
@@ -654,7 +669,7 @@ class WorkspaceReporter:
         :return: Comparison status and evidence for the report.
         """
         if runtime_output.startswith("Runtime skipped"):
-            return "Skipped; runtime did not execute."
+            return "skipped: runtime did not execute."
         references = self.workspace / "references" / "teacher"
         candidates = sorted(
             path for path in references.rglob("*")
@@ -663,23 +678,76 @@ class WorkspaceReporter:
             and path.suffix.lower() in {".txt", ".log", ".out"}
         ) if references.is_dir() else []
         if not candidates:
-            return "Not run; no expected-output reference was imported."
+            return "not available: no expected-output reference was imported."
         expected = candidates[0].read_text(encoding="utf-8", errors="replace")
-        status = (
-            "pass"
-            if self._normalize_output(runtime_output) == self._normalize_output(expected)
-            else "fail"
+        actual_output = self._extract_program_output(runtime_output)
+        actual = self._normalize_line_endings(actual_output)
+        reference = self._normalize_line_endings(expected)
+        if actual == reference:
+            status = "exact match"
+        elif self._remove_empty_lines(actual.split("\n")) == self._remove_empty_lines(
+            reference.split("\n")
+        ):
+            status = "newline-only difference"
+        else:
+            status = "manual review"
+        different_lines = self._different_line_count(
+            self._remove_empty_lines(actual.split("\n")),
+            self._remove_empty_lines(reference.split("\n")),
         )
-        return f"{status}: compared with {candidates[0].name}."
+        line_label = "line" if different_lines == 1 else "lines"
+        return (
+            f"{status} ({different_lines} differing {line_label}): "
+            f"compared with {candidates[0].name}."
+        )
 
     @staticmethod
-    def _normalize_output(value: str) -> str:
-        """Normalize line endings and trailing whitespace for output checks.
+    def _extract_program_output(runtime_log: str) -> str:
+        """Extract student stdout from the generated runtime log.
 
-        :param value: Program or reference output to normalize.
-        :return: Comparable output text.
+        :param runtime_log: Runtime log containing stdout and reporter
+            diagnostics.
+        :return: Student stdout without stderr or the exit-status footer.
         """
-        return "\n".join(line.rstrip() for line in value.strip().splitlines())
+        if runtime_log.startswith("Runtime skipped") or runtime_log.startswith(
+            ("Runtime timed out", "Runtime could not start")
+        ):
+            return runtime_log
+        output = runtime_log.split("\n[stderr]\n", 1)[0]
+        return output.split("\n[exit status:", 1)[0]
+
+    @staticmethod
+    def _normalize_line_endings(value: str) -> str:
+        """Normalize platform-specific line endings for output comparison.
+
+        :param value: Program or expected output text.
+        :return: Text using newline characters consistently.
+        """
+        return value.replace("\r\n", "\n").replace("\r", "\n")
+
+    @staticmethod
+    def _remove_empty_lines(lines: list[str]) -> list[str]:
+        """Remove blank lines while preserving non-blank output lines.
+
+        :param lines: Output split into normalized lines.
+        :return: Lines excluding empty or whitespace-only lines.
+        """
+        return [line for line in lines if line.strip()]
+
+    @staticmethod
+    def _different_line_count(actual: list[str], expected: list[str]) -> int:
+        """Count substantive line differences between two outputs.
+
+        :param actual: Student output lines with empty lines removed.
+        :param expected: TA reference lines with empty lines removed.
+        :return: Number of changed, inserted, or removed substantive lines.
+        """
+        matcher = difflib.SequenceMatcher(a=actual, b=expected)
+        return sum(
+            max(i2 - i1, j2 - j1)
+            for tag, i1, i2, j1, j2 in matcher.get_opcodes()
+            if tag != "equal"
+        )
 
     def _collect_legacy_details(
         self, build_root: Path, student_files_value: object
@@ -1115,7 +1183,14 @@ class WorkspaceReporter:
         )
         lines.extend([
             "", "GTest Check", "-----------", str(legacy_details["gtest_check"]),
-            "", "Output Check", "------------", str(legacy_details["output_check"]),
+            "", "Output Check", "------------",
+            WorkspaceReporter._summary_status(str(outcome["output_comparison"]))
+            + (
+                f" ({outcome['different_line_count']} differing line"
+                f"{'s' if outcome['different_line_count'] != 1 else ''})"
+                if outcome["different_line_count"] is not None else ""
+            ),
+            f"Legacy output-check configuration: {legacy_details['output_check']}",
             "", f"Build log: {WorkspaceReporter._display_report_path(outcome['workspace_root'], outcome['build_log'])}",
             f"Runtime log: {WorkspaceReporter._display_report_path(outcome['workspace_root'], outcome['runtime_log'])}",
             f"TA notes: {WorkspaceReporter._display_report_path(outcome['workspace_root'], report_path.parent / 'notes.md')}",
