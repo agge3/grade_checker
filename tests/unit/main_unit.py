@@ -135,7 +135,7 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertTrue(
                 reporter._check_expected_output(
                     "first\nsecond\n\n\n[exit status: 0]\n"
-                ).startswith("newline-only difference (")
+                ).startswith("newline diff (")
             )
             self.assertTrue(
                 reporter._check_expected_output(
@@ -146,6 +146,14 @@ class WorkspaceReportTests(unittest.TestCase):
                 reporter._check_expected_output(
                     "first\nchanged\n[exit status: 0]\n"
                 ).startswith("manual review (1 differing line):")
+            )
+            (reference_root / "expected-output.txt").write_text(
+                "First second\n", encoding="utf-8"
+            )
+            self.assertTrue(
+                reporter._check_expected_output(
+                    "first   second\n\n[exit status: 0]\n"
+                ).startswith("case diff, whitespace diff (0 differing lines):")
             )
 
     def test_report_overlays_teacher_template(self) -> None:

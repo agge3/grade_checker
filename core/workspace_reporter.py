@@ -414,9 +414,15 @@ class WorkspaceReporter:
         :param status: Grading status to display in the summary table.
         :return: Status prefixed with a colored Unicode indicator.
         """
+        difference_labels = {"newline diff", "case diff", "whitespace diff"}
+        if status == "exact match" or (
+            status and set(status.split(", ")).issubset(difference_labels)
+        ):
+            return f"✅ {status}"
+        if status.startswith("manual review"):
+            return f"⚠️ {status}"
         indicator = {
             "pass": "✅", "fail": "❌", "warning": "⚠️", "skipped": "⚠️",
-            "exact match": "✅", "newline-only difference": "✅",
             "manual review": "⚠️",
         }.get(status, "ℹ️")
         return f"{indicator} {status}"
@@ -683,17 +689,29 @@ class WorkspaceReporter:
         actual_output = self._extract_program_output(runtime_output)
         actual = self._normalize_line_endings(actual_output)
         reference = self._normalize_line_endings(expected)
-        if actual == reference:
-            status = "exact match"
-        elif self._remove_empty_lines(actual.split("\n")) == self._remove_empty_lines(
-            reference.split("\n")
-        ):
-            status = "newline-only difference"
-        else:
+        actual_lines = self._remove_empty_lines(actual.split("\n"))
+        reference_lines = self._remove_empty_lines(reference.split("\n"))
+        casefold_actual = [line.casefold() for line in actual_lines]
+        casefold_reference = [line.casefold() for line in reference_lines]
+        case_sensitive_compact_actual = ["".join(line.split()) for line in actual_lines]
+        case_sensitive_compact_reference = ["".join(line.split()) for line in reference_lines]
+        compact_actual = ["".join(line.split()) for line in casefold_actual]
+        compact_reference = ["".join(line.split()) for line in casefold_reference]
+        difference_types: list[str] = []
+        if actual != reference and self._empty_line_positions(actual) != self._empty_line_positions(reference):
+            difference_types.append("newline diff")
+        if case_sensitive_compact_actual != case_sensitive_compact_reference:
+            difference_types.append("case diff")
+        if casefold_actual != casefold_reference:
+            difference_types.append("whitespace diff")
+        substantive_difference = compact_actual != compact_reference
+        if substantive_difference:
             status = "manual review"
+        else:
+            status = ", ".join(difference_types) if difference_types else "exact match"
         different_lines = self._different_line_count(
-            self._remove_empty_lines(actual.split("\n")),
-            self._remove_empty_lines(reference.split("\n")),
+            compact_actual,
+            compact_reference,
         )
         line_label = "line" if different_lines == 1 else "lines"
         return (
@@ -733,6 +751,16 @@ class WorkspaceReporter:
         :return: Lines excluding empty or whitespace-only lines.
         """
         return [line for line in lines if line.strip()]
+
+    @staticmethod
+    def _empty_line_positions(value: str) -> list[int]:
+        """Record the positions of empty lines in normalized output.
+
+        :param value: Output text with normalized line endings.
+        :return: Zero-based positions occupied by empty or whitespace-only
+            lines.
+        """
+        return [index for index, line in enumerate(value.split("\n")) if not line.strip()]
 
     @staticmethod
     def _different_line_count(actual: list[str], expected: list[str]) -> int:

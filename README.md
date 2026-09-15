@@ -156,6 +156,8 @@ output reference in `references/teacher/`. The summary records whether it is
 an `exact match`, differs only by empty lines, or requires `manual review`.
 It also reports the number of differing substantive lines; empty-line-only
 differences count as zero.
+Case-only, whitespace-only, and combined case/whitespace differences are
+accepted and listed separately in the comparison column.
 
 ```bash
 python3 main.py report --workspace grading-workspaces/milestone2

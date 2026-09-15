@@ -15,6 +15,15 @@
 			"cwd": "${workspaceFolder}"
 		},
 		{
+			"name": "Debug existing submission",
+			"type": "lldb",
+			"request": "launch",
+			"program": "${workspaceFolder}/${input:milestone}/build-workspaces/${input:submission}/build/${input:executable}",
+			"cwd": "${workspaceFolder}/${input:milestone}/build-workspaces/${input:submission}",
+			"args": [],
+			"terminal": "integrated"
+		},
+		{
 			"name": "Python Debugger: Current File with Arguments for old grader",
 			"type": "debugpy",
 			"request": "launch",
@@ -32,6 +41,26 @@
 			"console": "integratedTerminal",
 			"env": {"prof": "hugh", "num": "3"},
 			"args": ["fetch", "--milestone", "milestone3-hugh"]
+		}
+	],
+	"inputs": [
+		{
+			"id": "milestone",
+			"type": "promptString",
+			"description": "Milestone workspace path",
+			"default": "grading-workspaces/milestone2"
+		},
+		{
+			"id": "submission",
+			"type": "promptString",
+			"description": "Submission identifier",
+			"default": "student01"
+		},
+		{
+			"id": "executable",
+			"type": "promptString",
+			"description": "Executable name",
+			"default": "Milestone_1"
 		}
 	]
 }

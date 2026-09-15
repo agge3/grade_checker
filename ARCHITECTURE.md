@@ -94,6 +94,8 @@ Runtime stdout is compared with the first TA-provided output reference under
 `references/teacher/`. The result is recorded as an exact match, a
 blank-line-only difference, or a manual-review difference in each summary,
 along with the count of differing non-empty lines.
+Case-only, whitespace-only, and combined case/whitespace differences are
+accepted and identified separately.
 
 The `generate-index-report` command calls
 `core.report_index.create_report_index()` to
