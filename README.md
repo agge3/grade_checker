@@ -180,6 +180,40 @@ plus links to `summary.md` and `similarity-report.txt` when those files exist.
 Links are relative, so the workspace can be moved. Re-running the command
 refreshes existing symlinks and does not overwrite real files.
 
+The general index command accepts a filepath relative to each submission's
+report directory:
+
+```bash
+python3 main.py generate-index notes.md \
+  --workspace grading-workspaces/milestone2
+```
+
+It can also be supplied with `--file` (or `--filepath`). With no filepath, the
+interactive command offers standard report files (`report.txt`, both logs,
+`notes.md`, and `overrides.json`) plus configured required student submission
+files. Required student files are linked from their normalized submission
+directories.
+
+The previous specialized log commands remain available as shortcuts:
+
+```bash
+python3 main.py generate-index-runtime-log \
+  --workspace grading-workspaces/milestone2
+python3 main.py generate-index-buildtime-log \
+  --workspace grading-workspaces/milestone2
+```
+
+These create `runtime-output.log-index/` and `build-output.log-index/` by
+default, respectively, with one link per submission. The aliases
+`generate-index-runtime` and `generate-index-buildtime` are also supported.
+Use `--output` to choose a different index directory.
+
+These create `runtime-log-index/` and `buildtime-log-index/` by default,
+respectively, with one link per submission. The aliases
+`generate-index-runtime` and `generate-index-buildtime` are also supported.
+The general command defaults to `index/`. Use `--output` to choose a different
+index directory.
+
 When `report` is run without `--workspace`, the interactive workflow asks
 whether to report all submissions or select one or more from the workspace.
 Reporting all submissions is the default.

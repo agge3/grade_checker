@@ -11,18 +11,26 @@ import config
 from tools import util
 
 import argparse
+import json
 import os
 import re
 import shlex
 import sys
 from pathlib import Path
+from collections.abc import Callable
 from typing import Sequence
 
 from core.workspace import Workspace, create_workspace as initialize_workspace
 from core.submission_importer import ImportResult, SubmissionImporter
 from core.teacher_importer import TeacherImportResult, TeacherImporter
 from core.workspace_reporter import WorkspaceReportResult, WorkspaceReporter
-from core.report_index import create_report_index
+from core.report_index import (
+    create_buildtime_log_index,
+    create_file_index,
+    create_report_index,
+    create_runtime_log_index,
+    ReportIndexResult,
+)
 
 # Grade HashTable.
 def grade_hash_table():
@@ -74,6 +82,10 @@ def _create_workspace_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="Grade Checker create-workspace",
         description="Interactively create an empty grading workspace.",
+    )
+    parser.add_argument(
+        "filepath_arg", nargs="?",
+        help="Path relative to each report directory; prompts if omitted",
     )
     parser.add_argument(
         "--output",
@@ -665,6 +677,178 @@ def report_index(arguments: Sequence[str]) -> int:
     return 0
 
 
+def _index_file_choices(workspace: str | Path) -> list[str]:
+    """Collect standard report files and required student files.
+
+    :param workspace: Initialized grading workspace to inspect.
+    :return: Unique relative paths suitable for the index prompt.
+    """
+    choices = [
+        "report.txt",
+        "build-output.log",
+        "runtime-output.log",
+        "notes.md",
+        "overrides.json",
+    ]
+    submissions_root = Path(workspace).expanduser() / "submissions"
+    if submissions_root.is_dir():
+        for metadata_path in sorted(submissions_root.glob("*/submission_metadata.json")):
+            try:
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            required_files = metadata.get("required_files", [])
+            if isinstance(required_files, list):
+                choices.extend(
+                    str(filename) for filename in required_files
+                    if isinstance(filename, str) and filename
+                )
+    return list(dict.fromkeys(choices))
+
+
+def _select_index_file_interactively(workspace: str | Path) -> str:
+    """Ask which standard or required file should be indexed.
+
+    :param workspace: Initialized grading workspace to inspect.
+    :return: Selected filepath relative to each report directory.
+    :raises ValueError: If the prompt is cancelled or no file is selected.
+    """
+    choices = _index_file_choices(workspace)
+    try:
+        import questionary
+    except ImportError:
+        questionary = None
+    if questionary is not None and sys.stdin.isatty() and sys.stdout.isatty():
+        selected = questionary.select("File to index:", choices=choices).ask()
+        if selected is None:
+            raise ValueError("File selection was cancelled.")
+        return selected
+    print("Select a file to index:")
+    for index, choice in enumerate(choices, start=1):
+        print(f"  {index}. {choice}")
+    selection = input("File number: ").strip()
+    try:
+        selected_index = int(selection) - 1
+    except ValueError as error:
+        raise ValueError("File selection must be a number.") from error
+    if selected_index < 0 or selected_index >= len(choices):
+        raise ValueError("File selection is out of range.")
+    return choices[selected_index]
+
+
+def _index_parser() -> argparse.ArgumentParser:
+    """Build the parser for the general file index command.
+
+    :return: Parser describing ``generate-index`` options.
+    """
+    parser = argparse.ArgumentParser(
+        prog="Grade Checker generate-index",
+        description="Create a symlink index for one file from each submission.",
+    )
+    parser.add_argument(
+        "filepath_arg", nargs="?",
+        help="Path relative to each report directory; prompts if omitted",
+    )
+    parser.add_argument(
+        "--workspace",
+        help="Initialized grading workspace directory; prompts if omitted",
+    )
+    parser.add_argument(
+        "--file", "--filepath", dest="filepath",
+        help="Path relative to each report directory; prompts if omitted",
+    )
+    parser.add_argument(
+        "--output",
+        help="Index directory; defaults to <workspace>/<filename>-index",
+    )
+    return parser
+
+
+def generate_index(arguments: Sequence[str]) -> int:
+    """Create an index for a selected file across all submission reports.
+
+    :param arguments: Arguments following ``generate-index``.
+    :return: Zero after the index is created.
+    """
+    args = _index_parser().parse_args(list(arguments))
+    workspace = args.workspace or _select_workspace_interactively()
+    filepath = args.filepath or args.filepath_arg or _select_index_file_interactively(workspace)
+    result = create_file_index(workspace, filepath, args.output)
+    print(f"Index: {result.directory}")
+    print(f"Links created: {len(result.links)}")
+    return 0
+
+
+def _log_index_parser(command: str, default_directory: str) -> argparse.ArgumentParser:
+    """Build the parser shared by runtime-log and buildtime-log index commands.
+
+    :param command: CLI command name shown in help and error messages.
+    :param default_directory: Default workspace-relative output directory.
+    :return: Parser describing log index options.
+    """
+    parser = argparse.ArgumentParser(
+        prog=f"Grade Checker {command}",
+        description=f"Create a symlink index for {command.removeprefix('generate-index-')} logs.",
+    )
+    parser.add_argument(
+        "--workspace",
+        help="Initialized grading workspace directory; prompts if omitted",
+    )
+    parser.add_argument(
+        "--output",
+        help=f"Index directory; defaults to <workspace>/{default_directory}",
+    )
+    return parser
+
+
+def _log_index(
+    arguments: Sequence[str],
+    command: str,
+    default_directory: str,
+    create_index: Callable[[str | Path, str | Path | None], ReportIndexResult],
+    label: str,
+) -> int:
+    """Create a symlink index for one category of submission logs.
+
+    :param arguments: Arguments following the selected CLI command.
+    :param command: CLI command name used to parse arguments.
+    :param default_directory: Default workspace-relative output directory.
+    :param create_index: Index factory accepting workspace and output paths.
+    :param label: Human-readable label printed after creation.
+    :return: Zero after the index is created.
+    """
+    args = _log_index_parser(command, default_directory).parse_args(list(arguments))
+    workspace = args.workspace or _select_workspace_interactively()
+    result = create_index(workspace, args.output)
+    print(f"{label} log index: {result.directory}")
+    print(f"Log links created: {len(result.links)}")
+    return 0
+
+
+def runtime_log_index(arguments: Sequence[str]) -> int:
+    """Create a symlink index for all submission runtime logs.
+
+    :param arguments: Arguments following the runtime log index command.
+    :return: Zero after the index is created.
+    """
+    return _log_index(
+        arguments, "generate-index-runtime-log", "runtime-log-index",
+        create_runtime_log_index, "Runtime"
+    )
+
+
+def buildtime_log_index(arguments: Sequence[str]) -> int:
+    """Create a symlink index for all submission buildtime logs.
+
+    :param arguments: Arguments following the buildtime log index command.
+    :return: Zero after the index is created.
+    """
+    return _log_index(
+        arguments, "generate-index-buildtime-log", "buildtime-log-index",
+        create_buildtime_log_index, "Buildtime"
+    )
+
+
 def _select_code_analyzer_interactively(
     default: Path | None, workspace: Path
 ) -> Path | None:
@@ -799,6 +983,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         return report(command_arguments[1:])
     if command_arguments and command_arguments[0] == "generate-index-report":
         return report_index(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "generate-index":
+        return generate_index(command_arguments[1:])
+    if command_arguments and command_arguments[0] in {
+        "generate-index-runtime-log", "generate-index-runtime"
+    }:
+        return runtime_log_index(command_arguments[1:])
+    if command_arguments and command_arguments[0] in {
+        "generate-index-buildtime-log", "generate-index-buildtime"
+    }:
+        return buildtime_log_index(command_arguments[1:])
 
     parser = argparse.ArgumentParser(
             prog = "Grade Checker"

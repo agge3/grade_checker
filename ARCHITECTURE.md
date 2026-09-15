@@ -93,6 +93,15 @@ create relative symlinks under `<workspace>/report-index` for each
 report when present. Existing symlinks are refreshed; real files are never
 overwritten.
 
+The general `generate-index` command accepts a filepath relative to each
+submission report directory and creates a relative symlink for each existing
+match under `<workspace>/<filename>-index`. Required student files are resolved from the
+matching normalized submission directory. The interactive command offers the
+standard report files and required files recorded in submission metadata.
+The `generate-index-runtime-log` and `generate-index-buildtime-log` commands
+remain shortcuts for the two log filenames, using
+`<workspace>/runtime-output.log-index` and `<workspace>/build-output.log-index`.
+
 `load_config()` validates the JSON and returns a `Config` object. `Config`
 implements the mapping interface, so existing consumers can use expressions
 such as `cfg["options"]["build"]`. The typed `cfg.data` property exposes the

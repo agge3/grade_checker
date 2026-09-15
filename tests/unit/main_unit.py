@@ -94,6 +94,26 @@ class TeacherImportTests(unittest.TestCase):
         select_workspace.assert_called_once_with()
         create_index.assert_called_once_with("selected-workspace", None)
 
+    @patch("main.runtime_log_index", return_value=0)
+    def test_main_dispatches_runtime_log_index_command(self, runtime_log_index) -> None:
+        """Ensure the runtime log index command reaches its handler."""
+        self.assertEqual(main.main(["generate-index-runtime-log"]), 0)
+        runtime_log_index.assert_called_once_with([])
+
+    @patch("main.buildtime_log_index", return_value=0)
+    def test_main_dispatches_buildtime_log_index_command(self, buildtime_log_index) -> None:
+        """Ensure the buildtime log index command reaches its handler."""
+        self.assertEqual(main.main(["generate-index-buildtime"]), 0)
+        buildtime_log_index.assert_called_once_with([])
+
+    @patch("main.create_file_index", return_value=ReportIndexResult(Path("index"), ()))
+    def test_generate_index_accepts_filepath(self, create_index) -> None:
+        """Ensure the general index command passes through a requested path."""
+        self.assertEqual(
+            main.generate_index(["--workspace", "workspace", "--file", "notes.md"]), 0
+        )
+        create_index.assert_called_once_with("workspace", "notes.md", None)
+
 
 class WorkspaceReportTests(unittest.TestCase):
     """Verify reporting prepares isolated teacher-template build workspaces."""
@@ -195,6 +215,32 @@ class ReportIndexTests(unittest.TestCase):
 
             with self.assertRaises(FileExistsError):
                 create_report_index(workspace)
+
+    def test_log_indexes_link_each_existing_submission_log(self) -> None:
+        """Ensure runtime and buildtime indexes expose their matching logs."""
+        from core.report_index import create_buildtime_log_index, create_runtime_log_index
+
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "workspace"
+            reports = workspace / "reports"
+            reports.mkdir(parents=True)
+            (workspace / "workspace.json").write_text("{}", encoding="utf-8")
+            for identifier in ("student01", "student02"):
+                report_root = reports / identifier
+                report_root.mkdir()
+                (report_root / "runtime-output.log").write_text("run", encoding="utf-8")
+                (report_root / "build-output.log").write_text("build", encoding="utf-8")
+
+            runtime_index = create_runtime_log_index(workspace).directory
+            buildtime_index = create_buildtime_log_index(workspace).directory
+            self.assertEqual(
+                os.readlink(runtime_index / "student01"),
+                "../reports/student01/runtime-output.log",
+            )
+            self.assertEqual(
+                os.readlink(buildtime_index / "student02"),
+                "../reports/student02/build-output.log",
+            )
 
 
 if __name__ == "__main__":
