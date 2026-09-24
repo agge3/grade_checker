@@ -24,8 +24,7 @@ def create_file_index(
 ) -> ReportIndexResult:
     """Create relative symlinks for one file from every submission.
 
-    :param workspace: Initialized grading workspace containing reports and
-        normalized submissions.
+    :param workspace: Initialized grading workspace containing student records.
     :param filepath: Non-empty relative path to resolve from each report
         directory. A configured required student file may instead be resolved
         from the matching submission directory.
@@ -35,7 +34,7 @@ def create_file_index(
     :raises ValueError: If filepath is absolute, empty, or escapes its report
         directory.
     :raises FileNotFoundError: If the workspace is not initialized or its
-        reports directory does not exist.
+        students directory does not exist.
     :raises FileExistsError: If an index entry would overwrite a real file or
         directory.
     :raises OSError: If a symlink cannot be created or removed.
@@ -48,7 +47,7 @@ def create_file_index(
         output,
         source_description=f"file '{filepath}'",
         default_directory_name=f"{relative_path.name}-index",
-        targets=lambda reports_root: _file_targets(reports_root, relative_path),
+        targets=lambda students_root: _file_targets(students_root, relative_path),
         missing_message="run report first",
     )
 
@@ -59,13 +58,13 @@ def create_report_index(
 ) -> ReportIndexResult:
     """Create relative symlinks to every generated report in a workspace.
 
-    :param workspace: Initialized grading workspace containing a ``reports``
+    :param workspace: Initialized grading workspace containing a ``students``
         directory.
     :param output: Directory in which to create the index. When omitted, the
         index is created at ``<workspace>/report-index``.
     :return: The index directory and the links created there.
     :raises FileNotFoundError: If the workspace is not initialized or its
-        reports directory does not exist.
+        students directory does not exist.
     :raises FileExistsError: If an index entry would overwrite a real file or
         directory.
     :raises OSError: If a symlink cannot be created or an existing symlink
@@ -74,7 +73,7 @@ def create_report_index(
     return _create_index(
         workspace,
         output,
-        source_description="reports",
+        source_description="students",
         default_directory_name="report-index",
         targets=_report_targets,
         missing_message="run report first",
@@ -87,8 +86,8 @@ def create_runtime_log_index(
 ) -> ReportIndexResult:
     """Create relative symlinks to every submission runtime log.
 
-    :param workspace: Initialized grading workspace containing submission
-        reports and their runtime logs.
+    :param workspace: Initialized grading workspace containing student
+        directories and their runtime logs.
     :param output: Directory in which to create the index. When omitted, the
         index is created at ``<workspace>/runtime-log-index``.
     :return: The index directory and the links created there.
@@ -107,8 +106,8 @@ def create_buildtime_log_index(
 ) -> ReportIndexResult:
     """Create relative symlinks to every submission build log.
 
-    :param workspace: Initialized grading workspace containing submission
-        reports and their build logs.
+    :param workspace: Initialized grading workspace containing student
+        directories and their build logs.
     :param output: Directory in which to create the index. When omitted, the
         index is created at ``<workspace>/buildtime-log-index``.
     :return: The index directory and the links created there.
@@ -148,10 +147,10 @@ def _create_index(
             f"Workspace '{workspace_root}' is not initialized; run create-workspace first."
         )
 
-    reports_root = workspace_root / "reports"
-    if not reports_root.is_dir():
+    students_root = workspace_root / "students"
+    if not students_root.is_dir():
         raise FileNotFoundError(
-            f"{source_description.capitalize()} directory '{reports_root}' does not exist; "
+            f"{source_description.capitalize()} directory '{students_root}' does not exist; "
             f"{missing_message}."
         )
 
@@ -168,7 +167,7 @@ def _create_index(
         if entry.is_symlink():
             entry.unlink()
 
-    report_targets = targets(reports_root)
+    report_targets = targets(students_root)
     links: list[Path] = []
     for name, target in report_targets:
         link_path = index_directory / name
@@ -183,18 +182,18 @@ def _create_index(
     return ReportIndexResult(index_directory, tuple(links))
 
 
-def _report_targets(reports_root: Path) -> list[tuple[str, Path]]:
+def _report_targets(students_root: Path) -> list[tuple[str, Path]]:
     """Return report files that should appear in a report index.
 
-    :param reports_root: Workspace reports directory.
+    :param students_root: Workspace students directory.
     :return: Named report paths for index creation.
     """
     report_targets: list[tuple[str, Path]] = []
-    for report_path in sorted(reports_root.glob("*/report.txt")):
+    for report_path in sorted(students_root.glob("*/report.txt")):
         if report_path.is_file():
             report_targets.append((report_path.parent.name, report_path))
     for filename in ("summary.md", "similarity-report.txt"):
-        report_path = reports_root / filename
+        report_path = students_root.parent / filename
         if report_path.is_file():
             report_targets.append((filename, report_path))
 
@@ -202,34 +201,33 @@ def _report_targets(reports_root: Path) -> list[tuple[str, Path]]:
 
 
 def _submission_log_targets(
-    reports_root: Path, filename: str
+    students_root: Path, filename: str
 ) -> list[tuple[str, Path]]:
     """Return existing per-submission logs with submission names as links.
 
-    :param reports_root: Workspace reports directory.
+    :param students_root: Workspace students directory.
     :param filename: Log filename to index.
     :return: Named log paths for index creation.
     """
-    return _file_targets(reports_root, Path(filename))
+    return _file_targets(students_root, Path(filename))
 
 
 def _file_targets(
-    reports_root: Path, relative_path: Path
+    students_root: Path, relative_path: Path
 ) -> list[tuple[str, Path]]:
     """Resolve one requested file for every report and submission.
 
-    :param reports_root: Workspace reports directory.
-    :param relative_path: Path relative to each report directory.
+    :param students_root: Workspace students directory.
+    :param relative_path: Path relative to each student directory.
     :return: Submission names and resolved file paths that exist.
     """
     targets: list[tuple[str, Path]] = []
-    submissions_root = reports_root.parent / "submissions"
-    for report_root in sorted(path for path in reports_root.iterdir() if path.is_dir()):
-        report_target = report_root / relative_path
+    for student_root in sorted(path for path in students_root.iterdir() if path.is_dir()):
+        report_target = student_root / relative_path
         if report_target.is_file():
-            targets.append((report_root.name, report_target))
+            targets.append((student_root.name, report_target))
             continue
-        metadata_path = submissions_root / report_root.name / "submission_metadata.json"
+        metadata_path = student_root / "submission_metadata.json"
         if not metadata_path.is_file():
             continue
         try:
@@ -240,7 +238,7 @@ def _file_targets(
         if isinstance(required_files, list) and relative_path.as_posix() in {
             str(item) for item in required_files if isinstance(item, str)
         }:
-            submission_target = submissions_root / report_root.name / relative_path
+            submission_target = student_root / "src-files" / relative_path
             if submission_target.is_file():
-                targets.append((report_root.name, submission_target))
+                targets.append((student_root.name, submission_target))
     return targets

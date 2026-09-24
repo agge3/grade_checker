@@ -283,16 +283,20 @@ root for `CodeAnalyzer/CodeAnalyzer.cpp` or `CodeAnalyzer.cpp`. If neither
 exists, it records that similarity analysis was not run and continues reporting
 the submissions.
 
-Similarity analysis must use a student-only submissions area separate from the
-normalized build workspaces. A suitable workspace layout is:
+Similarity analysis must use a temporary source-only index separate from the
+student records and normalized build workspaces. A suitable workspace layout is:
 
 ```text
 workspace/
-  submissions/
+  students/
     submission-1/
-      expected-source.cpp
+      src-files/
+        expected-source.cpp
+      submission_metadata.json
+      report.txt
     submission-2/
-      expected-source.cpp
+      src-files/
+        expected-source.cpp
   build-workspaces/
     submission-1/
       template and grader files
@@ -302,28 +306,19 @@ workspace/
       template and grader files
       student file overlaid on the template
       build/
-  reports/
-    submission-1/
-      report.txt
-      build-output.log
-      runtime-output.log
-    submission-2/
-      report.txt
-      build-output.log
-      runtime-output.log
-    similarity-report.txt
-    summary.md
-    runs/
-      2026-09-13-120001-selected.md
+  summary.md
+  similarity-report.txt
+  runs/
+    2026-09-13-120001-selected.md
 ```
 
-`workspace/submissions/` is the normalized student-only view and can be passed
-directly to `CodeAnalyzer` as its `inputRoot`. Each directory should contain
-only source files that came from that submission, including a recovered source
-file when the TA has manually repaired a submission. It must not contain copied
-grader/template source files, the known-correct solution, build output, or
-unrelated files. Otherwise, identical instructor files could inflate
-similarity results.
+`workspace/students/` is the normalized student record area. The reporter
+creates a temporary input index containing one directory per student, populated
+only from that student's `src-files/` directory, and passes that index to the
+unchanged `CodeAnalyzer` as its `inputRoot`. Metadata, reports, grader/template
+source files, the known-correct solution, build output, and unrelated files are
+never included. Otherwise, identical instructor files could inflate similarity
+results.
 
 The provided analyzer currently expects one directory per submission,
 recursively reads C++ source extensions, compares normalized token sets, and

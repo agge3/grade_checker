@@ -15,7 +15,7 @@ import sys
 from collections.abc import Sequence
 from typing import Callable, Mapping, TypedDict
 
-from core.similarity import SimilarityAnalyzer
+from core.similarity import SimilarityAnalyzer, temporary_source_index
 
 
 class CriterionResult(TypedDict):
@@ -86,8 +86,8 @@ class WorkspaceReporter:
             self.code_analyzer_path = self._find_repository_analyzer()
             if self.code_analyzer_path is not None:
                 print(f"Default CodeAnalyzer found at: {self.code_analyzer_path}")
-        reports_root = self.workspace / "reports"
-        reports_root.mkdir(parents=True, exist_ok=True)
+        runs_root = self.workspace / "runs"
+        runs_root.mkdir(parents=True, exist_ok=True)
         local_now = datetime.now().astimezone().replace(microsecond=0)
         timezone_name = local_now.tzname() or "local"
         run_id = local_now.strftime("%Y%m%d-%H%M%S")
@@ -96,24 +96,24 @@ class WorkspaceReporter:
         )
         reports: list[Path] = []
         summary_rows: list[dict[str, object]] = []
-        submissions_root = self.workspace / "submissions"
+        students_root = self.workspace / "students"
         selected_submissions = (
             [submission] if isinstance(submission, str) else list(submission or [])
         )
-        if selected_submissions and not submissions_root.is_dir():
+        if selected_submissions and not students_root.is_dir():
             raise ValueError(
                 "Unknown submission selection: the workspace has no submissions."
             )
-        if submissions_root.is_dir():
+        if students_root.is_dir():
             available_submission_roots = sorted(
-                path for path in submissions_root.iterdir() if path.is_dir()
+                path for path in students_root.iterdir() if path.is_dir()
             )
             if not selected_submissions:
                 submission_roots = available_submission_roots
             else:
                 unavailable = [
                     name for name in selected_submissions
-                    if submissions_root / name not in available_submission_roots
+                    if students_root / name not in available_submission_roots
                 ]
                 if unavailable:
                     available = ", ".join(
@@ -123,7 +123,7 @@ class WorkspaceReporter:
                         f"Unknown submission(s) {unavailable}. Available submissions: {available}."
                     )
                 submission_roots = [
-                    submissions_root / name for name in selected_submissions
+                    students_root / name for name in selected_submissions
                 ]
             total = len(submission_roots)
             for index, submission_root in enumerate(submission_roots, start=1):
@@ -148,7 +148,7 @@ class WorkspaceReporter:
                 outcome = self._process_submission(
                     submission_root, metadata, run_time, update_status
                 )
-                report_path = reports_root / submission_root.name / "report.txt"
+                report_path = submission_root / "report.txt"
                 report_path.parent.mkdir(parents=True, exist_ok=True)
                 self._write_report(report_path, outcome)
                 reports.append(report_path)
@@ -178,14 +178,14 @@ class WorkspaceReporter:
                 )
 
         available_count = (
-            len([path for path in submissions_root.iterdir() if path.is_dir()])
-            if submissions_root.is_dir() else 0
+            len([path for path in students_root.iterdir() if path.is_dir()])
+            if students_root.is_dir() else 0
         )
-        state_path = reports_root / "summary-state.json"
+        state_path = runs_root / "summary-state.json"
         state = self._load_summary_state(state_path)
         cumulative_rows = self._merge_summary_rows(state.get("rows", []), summary_rows)
         run_scope = "all" if not selected_submissions else "selected"
-        run_path = self._next_run_path(reports_root, run_id, run_scope)
+        run_path = self._next_run_path(runs_root, run_id, run_scope)
         history = state.get("history", [])
         if not isinstance(history, list):
             history = []
@@ -205,7 +205,7 @@ class WorkspaceReporter:
             ),
             encoding="utf-8",
         )
-        summary = reports_root / "summary.md"
+        summary = self.workspace / "summary.md"
         summary.write_text(
             self._write_summary(
                 cumulative_rows, run_time, "Grading Summary",
@@ -214,7 +214,7 @@ class WorkspaceReporter:
             encoding="utf-8",
         )
         similarity_report = self._write_similarity_report(
-            reports_root, submissions_root, run_time
+            students_root, run_time
         )
         return WorkspaceReportResult(
             self.workspace, tuple(reports), summary, similarity_report
@@ -390,20 +390,19 @@ class WorkspaceReporter:
             merged[str(row["submission"])] = row
         return [merged[name] for name in sorted(merged)]
 
-    def _next_run_path(self, reports_root: Path, run_id: str, scope: str) -> Path:
+    def _next_run_path(self, runs_root: Path, run_id: str, scope: str) -> Path:
         """Choose a unique path for an immutable per-run summary.
 
-        :param reports_root: Workspace report output directory.
+        :param runs_root: Workspace directory for immutable run summaries.
         :param run_id: Timestamp-based run identifier.
         :param scope: ``all`` or ``selected`` run label.
         :return: New Markdown run-summary path.
         """
-        run_root = reports_root / "runs"
-        run_root.mkdir(parents=True, exist_ok=True)
-        candidate = run_root / f"{run_id}-{scope}.md"
+        runs_root.mkdir(parents=True, exist_ok=True)
+        candidate = runs_root / f"{run_id}-{scope}.md"
         suffix = 2
         while candidate.exists():
-            candidate = run_root / f"{run_id}-{scope}-{suffix}.md"
+            candidate = runs_root / f"{run_id}-{scope}-{suffix}.md"
             suffix += 1
         return candidate
 
@@ -485,9 +484,7 @@ class WorkspaceReporter:
         :param update_status: Callback used to show the active reporting phase.
         :return: Report data including criteria, paths, and diagnostics.
         """
-        report_root = self.workspace / "reports" / submission_root.name
-        report_root.mkdir(parents=True, exist_ok=True)
-        self._link_submission_directory(report_root, submission_root)
+        report_root = submission_root
         update_status("preparing build workspace")
         build_root, teacher_files, replaced_files = self._prepare_build_workspace(
             submission_root, metadata
@@ -576,30 +573,6 @@ class WorkspaceReporter:
             "legacy_details": legacy_details,
             "workflow_flags": workflow_flags,
         }
-
-    @staticmethod
-    def _link_submission_directory(report_root: Path, submission_root: Path) -> None:
-        """Expose the normalized submission from its report directory.
-
-        :param report_root: Per-submission directory containing generated
-            reports and review files.
-        :param submission_root: Student-only normalized submission directory.
-        :raises FileExistsError: If ``submission`` is an existing real file or
-            directory in the report directory.
-        :raises OSError: If an existing symlink cannot be removed or the new
-            symlink cannot be created.
-        """
-        link_path = report_root / "submission"
-        if link_path.is_symlink():
-            link_path.unlink()
-        elif link_path.exists():
-            raise FileExistsError(
-                f"Cannot replace existing report entry '{link_path}'."
-            )
-        link_path.symlink_to(
-            os.path.relpath(submission_root, start=report_root),
-            target_is_directory=True,
-        )
 
     def _collect_workflow_flags(
         self,
@@ -1037,7 +1010,7 @@ class WorkspaceReporter:
             for filename in student_files:
                 if not isinstance(filename, str):
                     continue
-                source = submission_root / filename
+                source = submission_root / "src-files" / filename
                 target = build_root / filename
                 if target.exists():
                     replaced_files.append(filename)
@@ -1241,15 +1214,15 @@ class WorkspaceReporter:
             return str(path)
 
     def _write_similarity_report(
-        self, reports_root: Path, submissions_root: Path, run_time: str
+        self, students_root: Path, run_time: str
     ) -> Path:
         """Write a separate cohort similarity-analysis status report.
 
-        :param reports_root: Workspace report output directory.
+        :param students_root: Workspace directory containing student records.
         :param run_time: UTC timestamp shared by this reporting run.
         :return: Similarity report path.
         """
-        path = reports_root / "similarity-report.txt"
+        path = self.workspace / "similarity-report.txt"
         if self.code_analyzer_path is None:
             content = (
                 "Similarity report\n=================\n"
@@ -1260,11 +1233,12 @@ class WorkspaceReporter:
         else:
             try:
                 analyzer = SimilarityAnalyzer(self.code_analyzer_path)
-                content = (
-                    "Similarity report\n=================\n"
-                    f"Ran at: {run_time}\nStatus: complete\n"
-                    + analyzer.run(submissions_root, path)
-                )
+                with temporary_source_index(students_root) as source_index:
+                    content = (
+                        "Similarity report\n=================\n"
+                        f"Ran at: {run_time}\nStatus: complete\n"
+                        + analyzer.run(source_index, path)
+                    )
             except (FileNotFoundError, RuntimeError, ValueError) as error:
                 content = (
                     "Similarity report\n=================\n"

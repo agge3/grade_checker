@@ -9,9 +9,9 @@ from pathlib import Path
 
 WORKSPACE_DIRECTORIES = (
     "raw",
-    "submissions",
+    "students",
     "build-workspaces",
-    "reports",
+    "runs",
     "references",
 )
 
@@ -53,7 +53,7 @@ def create_workspace(
         (workspace_root / directory).mkdir(exist_ok=True)
 
     metadata = {
-        "workspace_version": 1,
+        "workspace_version": 2,
         "milestone": milestone,
         "milestone_configuration": str(configuration_path)
         if configuration_path is not None

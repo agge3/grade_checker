@@ -95,8 +95,8 @@ python3 main.py import-student-canvas-submissions \
 
 The importer is also available from Python as
 `core.submission_importer.SubmissionImporter`. It preserves the input ZIP under
-`raw/`, creates normalized directories under `submissions/`, and writes
-`submission_metadata.json`. Submitted ZIPs are recovered only when the required
+`raw/`, creates normalized student directories under `students/`, and writes
+`submission_metadata.json` beside each student's `src-files/` directory. Submitted ZIPs are recovered only when the required
 file is unambiguous at the submitted ZIP root; extra and nested files are
 reported as warnings.
 
@@ -140,16 +140,16 @@ python3 main.py report
 ```
 
 It selects an initialized workspace, prepares each submission's build
-workspace at report time, and writes per-submission reports plus
-`reports/summary.md`. The summary is a Markdown table containing submission,
+workspace at report time, and writes per-submission reports directly inside
+each `students/<submission>/` directory. The summary is written to
+`summary.md` at the workspace root and contains submission,
 build, and runtime statuses plus method and required-file counts. For scripted
 runs, provide the workspace directly. Each reporting command also writes a
-submission-only snapshot under `reports/runs/`; the cumulative summary keeps
-the latest known row for every submission.
+submission-only snapshot under `runs/`; `runs/summary-state.json` keeps the
+latest known row for every submission.
 
-Each `reports/<submission>/` directory also contains a relative `submission`
-directory symlink to the matching normalized student submission under
-`submissions/`.
+Each `students/<submission>/` directory contains `src-files/`, metadata,
+reports, logs, notes, and overrides for that student.
 
 The reporter compares captured student stdout with the first TA-provided
 output reference in `references/teacher/`. The summary records whether it is
@@ -192,8 +192,8 @@ plus links to `summary.md` and `similarity-report.txt` when those files exist.
 Links are relative, so the workspace can be moved. Re-running the command
 refreshes existing symlinks and does not overwrite real files.
 
-The general index command accepts a filepath relative to each submission's
-report directory:
+The general index command accepts a filepath relative to each student's
+directory:
 
 ```bash
 python3 main.py generate-index notes.md \
@@ -203,8 +203,8 @@ python3 main.py generate-index notes.md \
 It can also be supplied with `--file` (or `--filepath`). With no filepath, the
 interactive command offers standard report files (`report.txt`, both logs,
 `notes.md`, and `overrides.json`) plus configured required student submission
-files. Required student files are linked from their normalized submission
-directories.
+files. Required student files are linked from each student's `src-files/`
+directory.
 
 The previous specialized log commands remain available as shortcuts:
 
@@ -240,6 +240,18 @@ python3 main.py report \
   --workspace grading-workspaces/milestone2 \
   --code-analyzer /path/to/CodeAnalyzer
 ```
+
+To run only the similarity analyzer, without rebuilding submissions or
+rewriting `summary.md`, use:
+
+```bash
+python3 main.py analyze-similarity \
+  --workspace grading-workspaces/milestone2 \
+  --code-analyzer /path/to/CodeAnalyzer
+```
+
+The standalone command writes `similarity-report.txt` at the workspace root and discovers
+the repository's default `CodeAnalyzer.cpp` when `--code-analyzer` is omitted.
 
 Each submission report directory includes a guided `notes.md` for TA-written
 observations. The generated `report.txt` contains automated findings and

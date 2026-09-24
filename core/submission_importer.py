@@ -177,8 +177,10 @@ class SubmissionImporter:
         """
         preferred_name = self._internal_name(source_name)
         identifier = self._unique_name(preferred_name, used_names)
-        workspace = self.output_root / "submissions" / identifier
+        workspace = self.output_root / "students" / identifier
         workspace.mkdir(parents=True, exist_ok=False)
+        source_root = workspace / "src-files"
+        source_root.mkdir()
         warnings: list[str] = []
         if identifier != preferred_name:
             warnings.append(
@@ -189,7 +191,7 @@ class SubmissionImporter:
 
         if len(members) == 1 and members[0].lower().endswith(".zip"):
             recovered, copied, archive_warnings = self._recover_zip(
-                archive, members[0], workspace
+                archive, members[0], source_root
             )
             warnings.extend(archive_warnings)
         else:
@@ -204,7 +206,7 @@ class SubmissionImporter:
                 if normalized_name not in allowed_names:
                     warnings.append(f"extra file '{member_name}' was ignored")
                     continue
-                target = workspace / normalized_name
+                target = source_root / normalized_name
                 with archive.open(member) as source, target.open("wb") as destination:
                     shutil.copyfileobj(source, destination)
                 copied.append(target.name)
@@ -254,7 +256,7 @@ class SubmissionImporter:
 
         :param archive: Open bulk ZIP containing the submitted ZIP.
         :param member: Member name of the submitted ZIP.
-        :param workspace: Destination normalized workspace.
+        :param workspace: Destination ``src-files`` directory.
         :return: Recovery flag, copied names, and review warnings.
         """
         copied: list[str] = []

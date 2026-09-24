@@ -46,7 +46,7 @@ example, `milestone2-hugh` is converted to `milestone2` for grading paths, and
 
 The interactive `create-workspace` command initializes an empty grading
 workspace below the application root's `grading-workspaces/` directory. It
-creates `raw/`, `submissions/`, `build-workspaces/`, `reports/`, and
+creates `raw/`, `students/`, `build-workspaces/`, `runs/`, and
 `references/`, then records the selected milestone and directory mapping in
 `workspace.json`. Student-canvas-submissions import and normalization are separate
 operations handled later by `core.submission_importer`.
@@ -54,7 +54,8 @@ operations handled later by `core.submission_importer`.
 The `import-student-canvas-submissions` command requires an initialized
 workspace, then uses `SubmissionImporter` to place the raw
 student-canvas-submissions under `raw/` and
-normalized submissions under `submissions/`.
+normalized student records under `students/`. Each student record stores
+submitted files under `src-files/` and metadata at its root.
 
 When reporting runs, `WorkspaceReporter` creates an isolated
 `build-workspaces/{identifier}/` directory. It copies the imported teacher
@@ -73,10 +74,10 @@ Reporting is exposed through the explicit `report` command. With no workspace
 argument it offers initialized workspaces through a keyboard-navigable
 selection prompt. `WorkspaceReporter` prepares each submission's build
 workspace at report time, overlays student files on the teacher template, and
-writes per-submission reports plus a cumulative Markdown workspace summary
-table under `reports/summary.md`. Each invocation also writes a Markdown
-snapshot containing only the submissions processed by that invocation under
-`reports/runs/`. The
+writes per-submission reports directly under `students/{identifier}/`. The
+cumulative Markdown workspace summary is written to `summary.md` at the
+workspace root. Each invocation also writes a Markdown snapshot containing
+only the submissions processed by that invocation under `runs/`. The
 report command can process all submissions or one or more normalized submission
 identifiers. Each
 submission report retains the legacy report sections (file headers, configured
@@ -86,9 +87,8 @@ workspace workflow. The
 legacy `<milestone> --report` flag remains a compatibility path for repository
 reporting and does not use the workspace workflow.
 
-Each generated `reports/<submission>/` directory also contains the relative
-`submission` symlink, which points to that student's normalized directory under
-`submissions/`.
+Each generated `students/<submission>/` directory contains the student's
+`src-files/`, metadata, report, logs, notes, and overrides.
 
 Runtime stdout is compared with the first TA-provided output reference under
 `references/teacher/`. The result is recorded as an exact match, a
@@ -100,14 +100,14 @@ accepted and identified separately.
 The `generate-index-report` command calls
 `core.report_index.create_report_index()` to
 create relative symlinks under `<workspace>/report-index` for each
-`reports/<submission>/report.txt`, plus the workspace summary and similarity
+`students/<submission>/report.txt`, plus the workspace summary and similarity
 report when present. Existing symlinks are refreshed; real files are never
 overwritten.
 
 The general `generate-index` command accepts a filepath relative to each
 submission report directory and creates a relative symlink for each existing
 match under `<workspace>/<filename>-index`. Required student files are resolved from the
-matching normalized submission directory. The interactive command offers the
+matching student's `src-files/` directory. The interactive command offers the
 standard report files and required files recorded in submission metadata.
 The `generate-index-runtime-log` and `generate-index-buildtime-log` commands
 remain shortcuts for the two log filenames, using
@@ -140,19 +140,26 @@ The supported flags are independent and may be combined:
 
 The explicit workspace reporting command also accepts `--code-analyzer`. It
 compiles and runs the unchanged instructor `CodeAnalyzer.cpp` from a temporary
-staging directory, supplying its hard-coded JSON filename with workspace-local
-`inputRoot` and output values. The resulting report is preserved under
-`reports/similarity-report.txt`.
+staging directory, supplying its hard-coded JSON filename with a temporary
+source-only `inputRoot` containing one directory per student. The source index
+contains only C/C++ files from each student's `src-files/`; metadata, reports,
+templates, and build output are excluded. The resulting report is preserved
+under `similarity-report.txt` at the workspace root.
 Without an explicit path, the reporter checks the repository root for an
 optional `CodeAnalyzer/CodeAnalyzer.cpp` or `CodeAnalyzer.cpp`; absence of both
 leaves similarity analysis marked as not run.
+
+The standalone `analyze-similarity` command runs `core.similarity.SimilarityAnalyzer`
+against the temporary source-only index derived from `students/` and writes
+`similarity-report.txt`
+without rebuilding submissions or rewriting the grading summary.
 
 ## Configuration model
 
 `core.workspace.create_workspace()` owns workspace initialization and writes
 the workspace-level `workspace.json` metadata. `SubmissionImporter` is a
 separate later-stage component: it preserves student-canvas-submissions under `raw/`,
-creates normalized directories under `submissions/`, and records provenance
+creates normalized directories under `students/`, and records provenance
 and warnings in `submission_metadata.json`.
 
 Milestone JSON files provide the application’s dependency-injection data. The

@@ -22,7 +22,7 @@ class CreateWorkspaceTests(unittest.TestCase):
             output = Path(directory) / "workspace"
             status = main.create_workspace(["--output", str(output)])
             self.assertEqual(status, 0)
-            for name in ("raw", "submissions", "build-workspaces", "reports", "references"):
+            for name in ("raw", "students", "build-workspaces", "runs", "references"):
                 self.assertTrue((output / name).is_dir())
             metadata = json.loads((output / "workspace.json").read_text(encoding="utf-8"))
             self.assertIsNone(metadata["milestone"])
@@ -75,6 +75,14 @@ class TeacherImportTests(unittest.TestCase):
         """Ensure the explicit report command bypasses legacy flag parsing."""
         self.assertEqual(main.main(["report", "milestone2-hugh"]), 0)
         report.assert_called_once_with(["milestone2-hugh"])
+
+    @patch("main.analyze", return_value=0)
+    def test_main_dispatches_analyze_command(self, analyze) -> None:
+        """Ensure the standalone analyzer command bypasses legacy parsing."""
+        self.assertEqual(
+            main.main(["analyze-similarity", "--workspace", "workspace"]), 0
+        )
+        analyze.assert_called_once_with(["--workspace", "workspace"])
 
     @patch("main.report_index", return_value=0)
     def test_main_dispatches_generate_index_report_command(self, report_index) -> None:
@@ -187,20 +195,17 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertEqual((build_workspace / "support.hpp").read_text(), "support")
             self.assertEqual((build_workspace / "student.cpp").read_text(), "student")
             self.assertEqual(len(report_result.reports), 1)
-            submission_link = workspace / "reports" / result.submissions[0].identifier / "submission"
-            self.assertTrue(submission_link.is_symlink())
-            self.assertEqual(os.readlink(submission_link), "../../submissions/student")
-            self.assertTrue(
-                os.path.samefile(submission_link, workspace / "submissions" / "student")
-            )
+            student_root = workspace / "students" / result.submissions[0].identifier
+            self.assertTrue((student_root / "src-files" / "student.cpp").is_file())
             self.assertEqual(report_result.summary.name, "summary.md")
+            self.assertEqual(report_result.summary.parent, workspace)
             summary_text = report_result.summary.read_text(encoding="utf-8")
             self.assertIn("| Submission | Submission status |", summary_text)
             self.assertIn("Methods found (expected:", summary_text)
             self.assertIn("| student    |", summary_text)
             report_text = report_result.reports[0].read_text(encoding="utf-8")
             self.assertIn(f"Workspace path prefix: {workspace}", report_text)
-            self.assertIn("<workspace-path>/reports/student/build-output.log", report_text)
+            self.assertIn("<workspace-path>/students/student/build-output.log", report_text)
             self.assertNotIn(f"Student workspace: {workspace}", report_text)
             for section in (
                 "File Headers", "Methods", "Method Headers", "GTest Check",
@@ -210,7 +215,7 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertIn("Summary: 0 found, 0 missing.", report_text)
             self.assertNotIn("Raw Build Output", report_text)
             self.assertNotIn("Runtime Output", report_text)
-            notes = workspace / "reports" / result.submissions[0].identifier / "notes.md"
+            notes = workspace / "students" / result.submissions[0].identifier / "notes.md"
             notes_text = notes.read_text(encoding="utf-8")
             self.assertIn("different from `report.txt`", notes_text)
 
@@ -224,19 +229,20 @@ class ReportIndexTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory) / "workspace"
-            reports = workspace / "reports"
-            reports.mkdir(parents=True)
+            students = workspace / "students"
+            students.mkdir(parents=True)
             (workspace / "workspace.json").write_text("{}", encoding="utf-8")
-            student_report = reports / "student01" / "report.txt"
+            student_report = students / "student01" / "report.txt"
             student_report.parent.mkdir()
             student_report.write_text("grade", encoding="utf-8")
-            (reports / "summary.md").write_text("summary", encoding="utf-8")
+            (workspace / "summary.md").write_text("summary", encoding="utf-8")
+            (workspace / "similarity-report.txt").write_text("similarity", encoding="utf-8")
             index = create_report_index(workspace).directory
 
             self.assertEqual(
                 (index / "student01").read_text(encoding="utf-8"), "grade"
             )
-            self.assertEqual(os.readlink(index / "student01"), "../reports/student01/report.txt")
+            self.assertEqual(os.readlink(index / "student01"), "../students/student01/report.txt")
             self.assertTrue((index / "summary.md").is_symlink())
 
             student_report.unlink()
@@ -249,7 +255,7 @@ class ReportIndexTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory) / "workspace"
-            report = workspace / "reports" / "student01" / "report.txt"
+            report = workspace / "students" / "student01" / "report.txt"
             report.parent.mkdir(parents=True)
             (workspace / "workspace.json").write_text("{}", encoding="utf-8")
             report.write_text("grade", encoding="utf-8")
@@ -266,11 +272,11 @@ class ReportIndexTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory) / "workspace"
-            reports = workspace / "reports"
-            reports.mkdir(parents=True)
+            students = workspace / "students"
+            students.mkdir(parents=True)
             (workspace / "workspace.json").write_text("{}", encoding="utf-8")
             for identifier in ("student01", "student02"):
-                report_root = reports / identifier
+                report_root = students / identifier
                 report_root.mkdir()
                 (report_root / "runtime-output.log").write_text("run", encoding="utf-8")
                 (report_root / "build-output.log").write_text("build", encoding="utf-8")
@@ -279,11 +285,11 @@ class ReportIndexTests(unittest.TestCase):
             buildtime_index = create_buildtime_log_index(workspace).directory
             self.assertEqual(
                 os.readlink(runtime_index / "student01"),
-                "../reports/student01/runtime-output.log",
+                "../students/student01/runtime-output.log",
             )
             self.assertEqual(
                 os.readlink(buildtime_index / "student02"),
-                "../reports/student02/build-output.log",
+                "../students/student02/build-output.log",
             )
 
 

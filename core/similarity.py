@@ -8,6 +8,50 @@ import re
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+
+SOURCE_EXTENSIONS = frozenset({".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp"})
+
+
+@contextmanager
+def temporary_source_index(students_root: Path) -> Iterator[Path]:
+    """Create a temporary CodeAnalyzer input containing source files only.
+
+    :param students_root: Workspace directory containing one student directory
+        per submission. Each student directory may contain reports and metadata,
+        but its ``src-files`` child is the only input copied into the index.
+    :return: Context manager yielding a directory whose children are named
+        student identifiers and contain only C/C++ source and header files.
+    :raises FileNotFoundError: If the students directory does not exist.
+    :raises NotADirectoryError: If a student ``src-files`` path is not a directory.
+    """
+    students_root = Path(students_root)
+    if not students_root.is_dir():
+        raise FileNotFoundError(f"Students directory '{students_root}' was not found.")
+    with tempfile.TemporaryDirectory(prefix="grade-checker-similarity-") as temporary:
+        index_root = Path(temporary)
+        for student_root in sorted(path for path in students_root.iterdir() if path.is_dir()):
+            source_root = student_root / "src-files"
+            if not source_root.exists():
+                continue
+            if not source_root.is_dir():
+                raise NotADirectoryError(f"Student source path '{source_root}' is not a directory.")
+            target_root = index_root / student_root.name
+            for source in sorted(source_root.rglob("*")):
+                if (
+                    source.is_symlink()
+                    or not source.is_file()
+                    or source.suffix.lower() not in SOURCE_EXTENSIONS
+                ):
+                    continue
+                relative = source.relative_to(source_root)
+                target = target_root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+            target_root.mkdir(parents=True, exist_ok=True)
+        yield index_root
 
 
 class SimilarityAnalyzer:

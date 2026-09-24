@@ -24,6 +24,7 @@ from core.workspace import Workspace, create_workspace as initialize_workspace
 from core.submission_importer import ImportResult, SubmissionImporter
 from core.teacher_importer import TeacherImportResult, TeacherImporter
 from core.workspace_reporter import WorkspaceReportResult, WorkspaceReporter
+from core.similarity import SimilarityAnalyzer, temporary_source_index
 from core.report_index import (
     create_buildtime_log_index,
     create_file_index,
@@ -333,12 +334,12 @@ def _existing_submissions(workspace: str | Path) -> list[str]:
     :param workspace: Initialized grading workspace to inspect.
     :return: Sorted submission directory names containing submission metadata.
     """
-    submissions_root = Path(workspace).expanduser() / "submissions"
-    if not submissions_root.is_dir():
+    students_root = Path(workspace).expanduser() / "students"
+    if not students_root.is_dir():
         return []
     return sorted(
         path.name
-        for path in submissions_root.iterdir()
+        for path in students_root.iterdir()
         if path.is_dir() and (path / "submission_metadata.json").is_file()
     )
 
@@ -643,6 +644,67 @@ def _report_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _analyze_parser() -> argparse.ArgumentParser:
+    """Build the parser for the standalone similarity-analysis command.
+
+    :return: Parser describing workspace and CodeAnalyzer options.
+    """
+    parser = argparse.ArgumentParser(
+        prog="Grade Checker analyze-similarity",
+        description="Run CodeAnalyzer without running the grading reporter.",
+    )
+    parser.add_argument(
+        "--workspace",
+        help="Initialized grading workspace directory; prompts if omitted",
+    )
+    parser.add_argument(
+        "--code-analyzer",
+        help="CodeAnalyzer.cpp or its containing directory; discovers the default when omitted",
+    )
+    return parser
+
+
+def analyze(arguments: Sequence[str]) -> int:
+    """Run CodeAnalyzer independently against workspace submissions.
+
+    :param arguments: Arguments following ``analyze-similarity``.
+    :return: Zero after the similarity report is written.
+    :raises FileNotFoundError: If the workspace or analyzer cannot be found.
+    :raises RuntimeError: If CodeAnalyzer compilation or execution fails.
+    :raises ValueError: If the analyzer source is invalid.
+    """
+    args = _analyze_parser().parse_args(list(arguments))
+    workspace = Path(
+        _clean_entered_value(args.workspace)
+        if args.workspace
+        else _select_workspace_interactively()
+    ).expanduser()
+    if not (workspace / "workspace.json").is_file():
+        raise FileNotFoundError(
+            f"Workspace '{workspace}' is not initialized; run create-workspace first."
+        )
+    students_root = workspace / "students"
+    if not students_root.is_dir():
+        raise FileNotFoundError(
+            f"Workspace students directory '{students_root}' was not found."
+        )
+    analyzer_path = (
+        Path(args.code_analyzer).expanduser()
+        if args.code_analyzer
+        else WorkspaceReporter._find_repository_analyzer()
+    )
+    if analyzer_path is None:
+        raise FileNotFoundError(
+            "CodeAnalyzer was not found; provide --code-analyzer with its path."
+        )
+    output_path = workspace / "similarity-report.txt"
+    analyzer = SimilarityAnalyzer(analyzer_path)
+    with temporary_source_index(students_root) as source_index:
+        analyzer.run(source_index, output_path)
+    print(f"Similarity report: {_display_workspace_path(workspace, output_path)}")
+    return 0
+
+
 def _report_index_parser() -> argparse.ArgumentParser:
     """Build the parser for the generate-index-report command.
 
@@ -690,9 +752,9 @@ def _index_file_choices(workspace: str | Path) -> list[str]:
         "notes.md",
         "overrides.json",
     ]
-    submissions_root = Path(workspace).expanduser() / "submissions"
-    if submissions_root.is_dir():
-        for metadata_path in sorted(submissions_root.glob("*/submission_metadata.json")):
+    students_root = Path(workspace).expanduser() / "students"
+    if students_root.is_dir():
+        for metadata_path in sorted(students_root.glob("*/submission_metadata.json")):
             try:
                 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
@@ -981,6 +1043,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return import_teacher_zip(command_arguments[1:])
     if command_arguments and command_arguments[0] == "report":
         return report(command_arguments[1:])
+    if command_arguments and command_arguments[0] == "analyze-similarity":
+        return analyze(command_arguments[1:])
     if command_arguments and command_arguments[0] == "generate-index-report":
         return report_index(command_arguments[1:])
     if command_arguments and command_arguments[0] == "generate-index":
