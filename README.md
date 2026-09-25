@@ -114,6 +114,10 @@ copies direct UML matches into `uml-diagrams/` while preserving their names.
 Missing or misplaced UML files are retained as manual-review warnings in
 `submission_metadata.json`; they do not prevent source grading.
 
+Each import also writes `import-summary.md` at the workspace root. The summary
+lists the import status, required-file counts, UML status, copied-file counts,
+and manual-review warnings for every submission.
+
 Legacy milestones continue to support the existing single-file recovery path.
 
 When Canvas exports multiple files submitted by the same student, the importer

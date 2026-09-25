@@ -198,6 +198,8 @@ def _print_import_result(result: ImportResult) -> None:
     print(f"Imported submissions: {len(result.submissions)}")
     if result.raw_archive:
         print(f"Student-canvas-submissions: {result.raw_archive}")
+    if result.summary:
+        print(f"Import summary: {result.summary}")
     for submission in result.submissions:
         print(f"  {submission.identifier}: {submission.workspace}")
         for warning in submission.warnings:
@@ -217,7 +219,7 @@ def _print_import_command(
 
     :param workspace: Selected or entered workspace directory.
     :param student_canvas_submissions: Student-canvas-submissions ZIP path.
-    :param required_file: Required student filename.
+    :param required_files: Required student filenames accepted during import.
     :param optional_files: Optional filenames accepted during import.
     """
     command = [

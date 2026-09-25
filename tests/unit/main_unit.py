@@ -251,6 +251,11 @@ class WorkspaceReportTests(unittest.TestCase):
                 "additional UML-directory file 'notes.txt' was ignored",
                 result.submissions[0].warnings,
             )
+            self.assertEqual(result.summary, root / "workspace/import-summary.md")
+            summary_text = result.summary.read_text(encoding="utf-8")
+            self.assertIn("# Import Summary", summary_text)
+            self.assertIn("| student    | warning", summary_text)
+            self.assertIn("additional UML-directory file 'notes.txt' was ignored", summary_text)
 class ReportIndexTests(unittest.TestCase):
     """Verify report indexes expose generated reports without copying them."""
 

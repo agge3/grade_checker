@@ -59,7 +59,10 @@ source files under `src-files/`, UML artifacts under `uml-diagrams/`, and
 provenance plus manual-review warnings in metadata at its root. Structured
 submission rules are optional milestone configuration under
 `submission.required_files` and `submission.optional_files`; the legacy
-`files` setting remains reserved for instructor/template files.
+`files` setting remains reserved for instructor/template files. The importer
+also writes the workspace-level `import-summary.md` with per-submission import
+statuses and manual-review warnings; the reporting workflow continues to own
+`summary.md`.
 
 When reporting runs, `WorkspaceReporter` creates an isolated
 `build-workspaces/{identifier}/` directory. It copies the imported teacher

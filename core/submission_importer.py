@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -31,6 +32,7 @@ class ImportResult:
     submissions: list[Submission] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     raw_archive: Path | None = None
+    summary: Path | None = None
 
 
 class SubmissionImporter:
@@ -92,9 +94,83 @@ class SubmissionImporter:
                     )
                 if not result.submissions:
                     result.warnings.append("The student-canvas-submissions contains no files.")
+                result.summary = self._write_import_summary(result)
                 return result
         except BadZipFile as error:
             raise ValueError(f"Student-canvas-submissions '{self.archive_path}' is not a valid ZIP file.") from error
+
+    def _write_import_summary(self, result: ImportResult) -> Path:
+        """Write a Markdown summary describing the completed import.
+
+        :param result: Completed import result containing submissions and
+            warnings.
+        :return: Workspace path of the generated import summary.
+        """
+        summary_path = self.output_root / "import-summary.md"
+        local_now = datetime.now().astimezone().replace(microsecond=0)
+        run_time = f"{local_now.strftime('%Y-%m-%d %H:%M:%S')} ({local_now.tzname() or 'local'})"
+        rows: list[list[str]] = []
+        warning_sections: list[tuple[str, tuple[str, ...]]] = []
+        ordered_submissions = sorted(
+            result.submissions,
+            key=lambda submission: submission.identifier.casefold(),
+        )
+        for submission in ordered_submissions:
+            metadata_path = submission.workspace / "submission_metadata.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            files = metadata.get("student_files", metadata.get("files", []))
+            required = metadata.get("required_files", [])
+            file_names = {str(item) for item in files} if isinstance(files, list) else set()
+            required_names = [str(item) for item in required] if isinstance(required, list) else []
+            required_found = sum(Path(name).name in file_names for name in required_names)
+            uml = metadata.get("uml", {})
+            uml_status = str(uml.get("status", "not applicable")) if isinstance(uml, dict) else "not applicable"
+            status = "missing" if not file_names else "warning" if submission.warnings else "pass"
+            rows.append([
+                submission.identifier,
+                status,
+                f"{required_found}/{len(required_names)}" if required_names else "n/a",
+                uml_status,
+                str(len(file_names)),
+                str(len(submission.warnings)),
+            ])
+            if submission.warnings:
+                warning_sections.append((submission.identifier, submission.warnings))
+
+        headers = [
+            "Submission", "Import status", "Required files", "UML status",
+            "Files copied", "Warnings",
+        ]
+        widths = [
+            max([len(header)] + [len(row[index]) for row in rows])
+            for index, header in enumerate(headers)
+        ]
+        format_row = lambda values: "| " + " | ".join(
+            value.replace("|", "\\|").ljust(widths[index])
+            for index, value in enumerate(values)
+        ) + " |"
+        separator = "| " + " | ".join("-" * max(3, width) for width in widths) + " |"
+        lines = [
+            "# Import Summary", "",
+            f"Workspace path prefix: `{self.output_root}`  ",
+            f"Imported archive: `{result.raw_archive}`  ",
+            f"Ran at: {run_time}  ",
+            f"Submissions imported: {len(result.submissions)}  ",
+            f"Submissions requiring manual review: "
+            f"{sum(bool(submission.warnings) for submission in result.submissions)}", "",
+            format_row(headers), separator,
+            *(format_row(row) for row in rows),
+        ]
+        if warning_sections or result.warnings:
+            lines.extend(["", "## Manual Review Warnings", ""])
+            for identifier, warnings in warning_sections:
+                lines.append(f"### `{identifier}`")
+                lines.extend(f"- {warning}" for warning in warnings)
+            if result.warnings:
+                lines.append("### Import")
+                lines.extend(f"- {warning}" for warning in result.warnings)
+        summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return summary_path
 
     def _safe_entries(self, archive: ZipFile) -> list[str]:
         """Return non-directory archive entries and reject unsafe paths.
