@@ -772,6 +772,16 @@ def _report_index_parser() -> argparse.ArgumentParser:
         "--output",
         help="Index directory; defaults to <workspace>/report-index",
     )
+    parser.add_argument(
+        "--name-by",
+        choices=("identifier", "mapped"),
+        default=None,
+        help="Name links by stable identifier or workspace-mapped name",
+    )
+    parser.add_argument(
+        "--include-extension", action="store_true", default=None,
+        help="Append each submission target's file extension to its link name",
+    )
     return parser
 
 
@@ -783,7 +793,15 @@ def report_index(arguments: Sequence[str]) -> int:
     """
     args = _report_index_parser().parse_args(list(arguments))
     workspace = args.workspace or _select_workspace_interactively()
-    result = create_report_index(workspace, args.output)
+    name_mode, include_extension = _resolve_index_naming_options(
+        args.name_by, args.include_extension
+    )
+    if name_mode == "identifier" and not include_extension:
+        result = create_report_index(workspace, args.output)
+    else:
+        result = create_report_index(
+            workspace, args.output, name_mode, include_extension
+        )
     print(f"Report index: {result.directory}")
     print(f"Report links created: {len(result.links)}")
     return 0
@@ -873,6 +891,16 @@ def _index_parser() -> argparse.ArgumentParser:
         "--output",
         help="Index directory; defaults to <workspace>/<filename>-index",
     )
+    parser.add_argument(
+        "--name-by",
+        choices=("identifier", "mapped"),
+        default=None,
+        help="Name links by stable identifier or workspace-mapped name",
+    )
+    parser.add_argument(
+        "--include-extension", action="store_true", default=None,
+        help="Append each submission target's file extension to its link name",
+    )
     return parser
 
 
@@ -885,10 +913,57 @@ def generate_index(arguments: Sequence[str]) -> int:
     args = _index_parser().parse_args(list(arguments))
     workspace = args.workspace or _select_workspace_interactively()
     filepath = args.filepath or args.filepath_arg or _select_index_file_interactively(workspace)
-    result = create_file_index(workspace, filepath, args.output)
+    name_mode, include_extension = _resolve_index_naming_options(
+        args.name_by, args.include_extension
+    )
+    if name_mode == "identifier" and not include_extension:
+        result = create_file_index(workspace, filepath, args.output)
+    else:
+        result = create_file_index(
+            workspace, filepath, args.output, name_mode, include_extension
+        )
     print(f"Index: {result.directory}")
     print(f"Links created: {len(result.links)}")
     return 0
+
+
+def _resolve_index_naming_options(
+    name_mode: str | None, include_extension: bool | None
+) -> tuple[str, bool]:
+    """Resolve index naming options from flags or an interactive checklist.
+
+    :param name_mode: Explicit identifier or mapped naming choice, if given.
+    :param include_extension: Explicit extension choice, if given.
+    :return: Resolved naming mode and extension setting.
+    :raises ValueError: If the interactive prompt is cancelled.
+    """
+    if name_mode is not None or include_extension is not None:
+        return name_mode or "identifier", bool(include_extension)
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        return "identifier", False
+    try:
+        import questionary
+    except ImportError:
+        return "identifier", False
+    selected = questionary.checkbox(
+        "Choose symlink naming options (Space to toggle, Enter to continue):",
+        choices=[
+            questionary.Choice(
+                "Use mapped student names",
+                value="mapped",
+            ),
+            questionary.Choice(
+                "Append original file extensions",
+                value="extension",
+            ),
+        ],
+    ).ask()
+    if selected is None:
+        raise ValueError("Index naming selection was cancelled.")
+    return (
+        "mapped" if "mapped" in selected else "identifier",
+        "extension" in selected,
+    )
 
 
 def _log_index_parser(command: str, default_directory: str) -> argparse.ArgumentParser:
@@ -909,6 +984,16 @@ def _log_index_parser(command: str, default_directory: str) -> argparse.Argument
     parser.add_argument(
         "--output",
         help=f"Index directory; defaults to <workspace>/{default_directory}",
+    )
+    parser.add_argument(
+        "--name-by",
+        choices=("identifier", "mapped"),
+        default=None,
+        help="Name links by stable identifier or workspace-mapped name",
+    )
+    parser.add_argument(
+        "--include-extension", action="store_true", default=None,
+        help="Append each submission target's file extension to its link name",
     )
     return parser
 
@@ -931,7 +1016,15 @@ def _log_index(
     """
     args = _log_index_parser(command, default_directory).parse_args(list(arguments))
     workspace = args.workspace or _select_workspace_interactively()
-    result = create_index(workspace, args.output)
+    name_mode, include_extension = _resolve_index_naming_options(
+        args.name_by, args.include_extension
+    )
+    if name_mode == "identifier" and not include_extension:
+        result = create_index(workspace, args.output)
+    else:
+        result = create_index(
+            workspace, args.output, name_mode, include_extension
+        )
     print(f"{label} log index: {result.directory}")
     print(f"Log links created: {len(result.links)}")
     return 0

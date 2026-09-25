@@ -119,6 +119,9 @@ submission report directory and creates a relative symlink for each existing
 match under `<workspace>/<filename>-index`. Required student files are resolved from the
 matching student's `src-files/` directory. The interactive command offers the
 standard report files and required files recorded in submission metadata.
+Index commands support identifier-based or mapped-name link labels, with an
+option to append the original target file extension to submission link names.
+Interactive invocations expose both choices through a multi-select prompt.
 The `generate-index-runtime-log` and `generate-index-buildtime-log` commands
 remain shortcuts for the two log filenames, using
 `<workspace>/runtime-output.log-index` and `<workspace>/build-output.log-index`.

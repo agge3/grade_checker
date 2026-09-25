@@ -220,6 +220,9 @@ This creates `report-index/` by default, with one link per submission report
 plus links to `report-summary.md` and `similarity-report.txt` when those files exist.
 Links are relative, so the workspace can be moved. Re-running the command
 refreshes existing symlinks and does not overwrite real files.
+Use `--name-by mapped` to use `submission-identifiers.csv` display names for
+submission links. Add `--include-extension` to append the original target
+extension to each link name.
 
 The general index command accepts a filepath relative to each student's
 directory:
@@ -234,6 +237,12 @@ interactive command offers standard report files (`report.txt`, both logs,
 `notes.md`, and `overrides.json`) plus configured required student submission
 files. Required student files are linked from each student's `src-files/`
 directory.
+All index commands accept `--name-by identifier` (the default) or
+`--name-by mapped`. Add `--include-extension` when link names should include
+the original target extension, such as `Ada Lovelace.cpp` or
+`Ada Lovelace.txt`.
+When these flags are omitted in an interactive terminal, an arrow-navigable
+checklist lets you independently select mapped names and extension appending.
 
 The previous specialized log commands remain available as shortcuts:
 

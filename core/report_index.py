@@ -8,6 +8,8 @@ from pathlib import Path
 from collections.abc import Callable
 import json
 
+from core.submission_names import load_submission_names
+
 
 @dataclass(frozen=True)
 class ReportIndexResult:
@@ -21,6 +23,8 @@ def create_file_index(
     workspace: str | Path,
     filepath: str,
     output: str | Path | None = None,
+    name_mode: str = "identifier",
+    include_extension: bool = False,
 ) -> ReportIndexResult:
     """Create relative symlinks for one file from every submission.
 
@@ -30,6 +34,10 @@ def create_file_index(
         from the matching submission directory.
     :param output: Directory in which to create the index. When omitted, the
         index is created at ``<workspace>/<filename>-index``.
+    :param name_mode: Use ``identifier`` or ``mapped`` for submission link
+        names.
+    :param include_extension: Append the original target file extension to
+        submission link names when true.
     :return: The index directory and the links created there.
     :raises ValueError: If filepath is absolute, empty, or escapes its report
         directory.
@@ -49,12 +57,16 @@ def create_file_index(
         default_directory_name=f"{relative_path.name}-index",
         targets=lambda students_root: _file_targets(students_root, relative_path),
         missing_message="run report first",
+        name_mode=name_mode,
+        include_extension=include_extension,
     )
 
 
 def create_report_index(
     workspace: str | Path,
     output: str | Path | None = None,
+    name_mode: str = "identifier",
+    include_extension: bool = False,
 ) -> ReportIndexResult:
     """Create relative symlinks to every generated report in a workspace.
 
@@ -62,6 +74,10 @@ def create_report_index(
         directory.
     :param output: Directory in which to create the index. When omitted, the
         index is created at ``<workspace>/report-index``.
+    :param name_mode: Use ``identifier`` or ``mapped`` for submission link
+        names.
+    :param include_extension: Append the original report extension to
+        submission link names when true.
     :return: The index directory and the links created there.
     :raises FileNotFoundError: If the workspace is not initialized or its
         students directory does not exist.
@@ -77,12 +93,16 @@ def create_report_index(
         default_directory_name="report-index",
         targets=_report_targets,
         missing_message="run report first",
+        name_mode=name_mode,
+        include_extension=include_extension,
     )
 
 
 def create_runtime_log_index(
     workspace: str | Path,
     output: str | Path | None = None,
+    name_mode: str = "identifier",
+    include_extension: bool = False,
 ) -> ReportIndexResult:
     """Create relative symlinks to every submission runtime log.
 
@@ -90,6 +110,9 @@ def create_runtime_log_index(
         directories and their runtime logs.
     :param output: Directory in which to create the index. When omitted, the
         index is created at ``<workspace>/runtime-log-index``.
+    :param name_mode: Use ``identifier`` or ``mapped`` for submission link
+        names.
+    :param include_extension: Append the original log extension when true.
     :return: The index directory and the links created there.
     :raises FileNotFoundError: If the workspace is not initialized or its
         reports directory does not exist.
@@ -97,12 +120,16 @@ def create_runtime_log_index(
         directory.
     :raises OSError: If a symlink cannot be created or removed.
     """
-    return create_file_index(workspace, "runtime-output.log", output)
+    return create_file_index(
+        workspace, "runtime-output.log", output, name_mode, include_extension
+    )
 
 
 def create_buildtime_log_index(
     workspace: str | Path,
     output: str | Path | None = None,
+    name_mode: str = "identifier",
+    include_extension: bool = False,
 ) -> ReportIndexResult:
     """Create relative symlinks to every submission build log.
 
@@ -110,6 +137,9 @@ def create_buildtime_log_index(
         directories and their build logs.
     :param output: Directory in which to create the index. When omitted, the
         index is created at ``<workspace>/buildtime-log-index``.
+    :param name_mode: Use ``identifier`` or ``mapped`` for submission link
+        names.
+    :param include_extension: Append the original log extension when true.
     :return: The index directory and the links created there.
     :raises FileNotFoundError: If the workspace is not initialized or its
         reports directory does not exist.
@@ -117,7 +147,9 @@ def create_buildtime_log_index(
         directory.
     :raises OSError: If a symlink cannot be created or removed.
     """
-    return create_file_index(workspace, "build-output.log", output)
+    return create_file_index(
+        workspace, "build-output.log", output, name_mode, include_extension
+    )
 
 
 def _create_index(
@@ -127,6 +159,8 @@ def _create_index(
     default_directory_name: str,
     targets: Callable[[Path], list[tuple[str, Path]]],
     missing_message: str,
+    name_mode: str,
+    include_extension: bool,
 ) -> ReportIndexResult:
     """Create an owned symlink index from a workspace source.
 
@@ -136,6 +170,9 @@ def _create_index(
     :param default_directory_name: Directory name used when output is omitted.
     :param targets: Callable that returns ``(name, path)`` source entries.
     :param missing_message: Suggested command when source data is absent.
+    :param name_mode: Use ``identifier`` or ``mapped`` for submission link
+        names.
+    :param include_extension: Append the original target extension when true.
     :return: The index directory and the links created there.
     :raises FileNotFoundError: If the workspace or source directory is absent.
     :raises FileExistsError: If a real index entry would be overwritten.
@@ -161,6 +198,10 @@ def _create_index(
     )
     index_directory.mkdir(parents=True, exist_ok=True)
 
+    if name_mode not in {"identifier", "mapped"}:
+        raise ValueError("Index name mode must be 'identifier' or 'mapped'.")
+    submission_names = load_submission_names(workspace_root)
+
     # The index directory is owned by this command: stale symlinks are safe to
     # remove, while real files and directories are deliberately preserved.
     for entry in index_directory.iterdir():
@@ -170,6 +211,10 @@ def _create_index(
     report_targets = targets(students_root)
     links: list[Path] = []
     for name, target in report_targets:
+        name = _index_entry_name(
+            students_root, name, target, submission_names, name_mode,
+            include_extension,
+        )
         link_path = index_directory / name
         if link_path.exists() or link_path.is_symlink():
             raise FileExistsError(
@@ -180,6 +225,41 @@ def _create_index(
         links.append(link_path)
 
     return ReportIndexResult(index_directory, tuple(links))
+
+
+def _index_entry_name(
+    students_root: Path,
+    identifier_name: str,
+    target: Path,
+    submission_names: dict[str, str],
+    name_mode: str,
+    include_extension: bool,
+) -> str:
+    """Build one symlink name from its submission and source extension.
+
+    :param students_root: Workspace directory containing student records.
+    :param identifier_name: Existing identifier-based entry name.
+    :param target: Existing source file receiving the symlink.
+    :param submission_names: Workspace mapping of identifiers to display names.
+    :param name_mode: Select ``identifier`` or ``mapped`` naming.
+    :param include_extension: Append the target suffix when true.
+    :return: Symlink filename, including the source extension when applicable.
+    """
+    try:
+        relative_target = target.relative_to(students_root)
+    except ValueError:
+        return identifier_name
+    if not relative_target.parts:
+        return identifier_name
+    identifier = relative_target.parts[0]
+    if name_mode == "mapped":
+        base_name = submission_names.get(identifier, identifier)
+        base_name = base_name.replace("/", "_").replace("\\", "_").strip()
+    else:
+        base_name = identifier
+    if not base_name:
+        base_name = identifier
+    return f"{base_name}{target.suffix}" if include_extension and target.suffix else base_name
 
 
 def _report_targets(students_root: Path) -> list[tuple[str, Path]]:
