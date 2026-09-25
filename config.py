@@ -40,6 +40,13 @@ class FetchConfig(TypedDict):
     clear: bool
 
 
+class SubmissionConfig(TypedDict, total=False):
+    """Describe files expected in a student submission."""
+
+    required_files: list[str]
+    optional_files: list[str]
+
+
 MethodDefinition = TypedDict(
     "MethodDefinition",
     {"return": str, "params": list[str] | None},
@@ -63,6 +70,7 @@ class ConfigData(TypedDict):
     extra_credit: ExtraCreditConfig
     fetch: FetchConfig
     files: list[str]
+    submission: SubmissionConfig
 
 
 ConfigValue = Any
@@ -161,6 +169,14 @@ def _validate(values: Mapping[str, ConfigValue]) -> None:
         raise TypeError("Files should be a list")
     if not isinstance(values["classes"], list):
         raise TypeError("Classes should be a list")
+
+    submission = values.get("submission")
+    if submission is not None:
+        if not isinstance(submission, Mapping):
+            raise TypeError("Submission should be a mapping")
+        for key in ("required_files", "optional_files"):
+            if key in submission and not isinstance(submission[key], list):
+                raise TypeError(f"Submission '{key}' should be a list")
 
     methods = values["methods"]
     if not isinstance(methods, Mapping):

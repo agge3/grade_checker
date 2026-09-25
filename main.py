@@ -174,7 +174,12 @@ def _import_submissions_parser() -> argparse.ArgumentParser:
         dest="student_canvas_submissions",
         help="Student-canvas-submissions ZIP exported from Canvas",
     )
-    parser.add_argument("--required-file", help="Required student filename, such as milestone1.cpp")
+    parser.add_argument(
+        "--required-file",
+        action="append",
+        dest="required_files",
+        help="Required student filename; may be repeated",
+    )
     parser.add_argument(
         "--optional-file",
         action="append",
@@ -205,7 +210,7 @@ def _print_import_result(result: ImportResult) -> None:
 def _print_import_command(
     workspace: str,
     student_canvas_submissions: str,
-    required_file: str,
+    required_files: list[str],
     optional_files: list[str],
 ) -> None:
     """Print a shell command equivalent to the completed import prompts.
@@ -223,9 +228,9 @@ def _print_import_command(
         workspace,
         "--student-canvas-submissions",
         student_canvas_submissions,
-        "--required-file",
-        required_file,
     ]
+    for required_file in required_files:
+        command.extend(("--required-file", required_file))
     for optional_file in optional_files:
         command.extend(("--optional-file", optional_file))
     print(f"Equivalent command: {shlex.join(command)}")
@@ -427,6 +432,23 @@ def import_submissions(arguments: Sequence[str]) -> int:
         if args.workspace
         else _select_workspace_interactively()
     )
+    workspace_root = Path(workspace_value).expanduser()
+    workspace_config = workspace_root / "workspace.json"
+    if not workspace_config.is_file():
+        raise FileNotFoundError(
+            f"Workspace '{workspace_root}' is not initialized; run create-workspace first."
+        )
+    workspace_metadata = json.loads(workspace_config.read_text(encoding="utf-8"))
+    configured_submission: dict[str, object] = {}
+    configuration_path = workspace_metadata.get("milestone_configuration")
+    if isinstance(configuration_path, str) and configuration_path:
+        milestone_config = config.load_config(
+            str(workspace_metadata.get("milestone", "workspace")),
+            Path(configuration_path),
+        )
+        submission_value = milestone_config.get("submission", {})
+        if isinstance(submission_value, dict):
+            configured_submission = submission_value
     if args.student_canvas_submissions:
         submissions_value = args.student_canvas_submissions
     elif questionary is None:
@@ -438,16 +460,30 @@ def import_submissions(arguments: Sequence[str]) -> int:
         if submissions_value is None:
             raise ValueError("Student-canvas-submissions prompt was cancelled.")
         submissions_value = _clean_entered_value(submissions_value)
-    if args.required_file:
-        required_file = args.required_file
+    configured_required = configured_submission.get("required_files", [])
+    structured_submissions = bool(configured_submission)
+    required_files = (
+        [str(item) for item in configured_required if isinstance(item, str)]
+        if isinstance(configured_required, list) else []
+    )
+    if args.required_files:
+        required_files = args.required_files
+        required_file = required_files[0]
+    elif required_files:
+        required_file = required_files[0]
     elif questionary is None:
         required_file = _clean_entered_value(input("Required student filename: "))
+        required_files = [required_file]
     else:
         required_file = questionary.text("Required student filename:").ask()
         if required_file is None:
             raise ValueError("Required filename prompt was cancelled.")
         required_file = _clean_entered_value(required_file)
+        required_files = [required_file]
     optional_files = args.optional_files
+    configured_optional = configured_submission.get("optional_files", [])
+    if optional_files is None and isinstance(configured_optional, list):
+        optional_files = [str(item) for item in configured_optional if isinstance(item, str)]
     if optional_files is None:
         if questionary is None:
             optional_value = input("Optional files [README.md]: ")
@@ -463,25 +499,21 @@ def import_submissions(arguments: Sequence[str]) -> int:
             for item in optional_value.split(",")
             if _clean_entered_value(item)
         ] or ["README.md"]
-    if not workspace_value or not submissions_value or not required_file:
-        raise ValueError("Workspace, student-canvas-submissions, and required filename are required.")
+    if not workspace_value or not submissions_value:
+        raise ValueError("Workspace and student-canvas-submissions are required.")
     _print_import_command(
         workspace_value,
         submissions_value,
-        required_file,
+        required_files,
         optional_files,
     )
-    workspace_root = Path(workspace_value).expanduser()
-    workspace_config = workspace_root / "workspace.json"
-    if not workspace_config.is_file():
-        raise FileNotFoundError(
-            f"Workspace '{workspace_root}' is not initialized; run create-workspace first."
-        )
     result = SubmissionImporter(
         submissions_value,
         workspace_root,
-        required_filename=required_file,
+        required_filename=required_file or None,
         optional_filenames=optional_files,
+        required_filenames=required_files,
+        structured_submissions=structured_submissions,
     ).import_submissions()
     _print_import_result(result)
     return 0

@@ -219,7 +219,38 @@ class WorkspaceReportTests(unittest.TestCase):
             notes_text = notes.read_text(encoding="utf-8")
             self.assertIn("different from `report.txt`", notes_text)
 
+    def test_structured_submission_imports_source_and_uml_files(self) -> None:
+        """Ensure Milestone 2 layout rules separate source and UML artifacts."""
+        from core.submission_importer import SubmissionImporter
+        from zipfile import ZipFile
 
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            inner = root / "student.zip"
+            with ZipFile(inner, "w") as submitted:
+                submitted.writestr("Project/HashTable.cpp", "source")
+                submitted.writestr("Project/uml/class.png", "class")
+                submitted.writestr("Project/uml/sequence.png", "sequence")
+                submitted.writestr("Project/uml/notes.txt", "review")
+            outer = root / "submissions.zip"
+            with ZipFile(outer, "w") as archive:
+                archive.write(inner, "student.zip")
+
+            result = SubmissionImporter(
+                outer,
+                root / "workspace",
+                required_filename="HashTable.cpp",
+                required_filenames=("HashTable.cpp",),
+                structured_submissions=True,
+            ).import_submissions()
+            student = result.submissions[0].workspace
+            self.assertTrue((student / "src-files/HashTable.cpp").is_file())
+            self.assertTrue((student / "uml-diagrams/class.png").is_file())
+            self.assertTrue((student / "uml-diagrams/sequence.png").is_file())
+            self.assertIn(
+                "additional UML-directory file 'notes.txt' was ignored",
+                result.submissions[0].warnings,
+            )
 class ReportIndexTests(unittest.TestCase):
     """Verify report indexes expose generated reports without copying them."""
 

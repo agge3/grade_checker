@@ -96,9 +96,25 @@ python3 main.py import-student-canvas-submissions \
 The importer is also available from Python as
 `core.submission_importer.SubmissionImporter`. It preserves the input ZIP under
 `raw/`, creates normalized student directories under `students/`, and writes
-`submission_metadata.json` beside each student's `src-files/` directory. Submitted ZIPs are recovered only when the required
-file is unambiguous at the submitted ZIP root; extra and nested files are
-reported as warnings.
+`submission_metadata.json` beside each student's `src-files/` directory. For
+structured milestones, required and optional student files are read from the
+milestone configuration's `submission` section:
+
+```json
+"submission": {
+  "required_files": ["HashTable.cpp", "HashTable.hpp"],
+  "optional_files": ["README.md"]
+}
+```
+
+Milestone 2 student ZIPs must contain one top-level directory. Configured
+source files must be direct children of that directory. The importer copies
+matching source files to `src-files/`, warns about additional files, and
+copies direct UML matches into `uml-diagrams/` while preserving their names.
+Missing or misplaced UML files are retained as manual-review warnings in
+`submission_metadata.json`; they do not prevent source grading.
+
+Legacy milestones continue to support the existing single-file recovery path.
 
 When Canvas exports multiple files submitted by the same student, the importer
 groups files with the same Canvas-generated metadata prefix into one normalized

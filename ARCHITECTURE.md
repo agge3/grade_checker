@@ -55,7 +55,11 @@ The `import-student-canvas-submissions` command requires an initialized
 workspace, then uses `SubmissionImporter` to place the raw
 student-canvas-submissions under `raw/` and
 normalized student records under `students/`. Each student record stores
-submitted files under `src-files/` and metadata at its root.
+source files under `src-files/`, UML artifacts under `uml-diagrams/`, and
+provenance plus manual-review warnings in metadata at its root. Structured
+submission rules are optional milestone configuration under
+`submission.required_files` and `submission.optional_files`; the legacy
+`files` setting remains reserved for instructor/template files.
 
 When reporting runs, `WorkspaceReporter` creates an isolated
 `build-workspaces/{identifier}/` directory. It copies the imported teacher
@@ -158,9 +162,12 @@ without rebuilding submissions or rewriting the grading summary.
 
 `core.workspace.create_workspace()` owns workspace initialization and writes
 the workspace-level `workspace.json` metadata. `SubmissionImporter` is a
-separate later-stage component: it preserves student-canvas-submissions under `raw/`,
-creates normalized directories under `students/`, and records provenance
-and warnings in `submission_metadata.json`.
+separate later-stage component: it preserves student-canvas-submissions under
+`raw/`, creates normalized directories under `students/`, and records
+provenance and warnings in `submission_metadata.json`. Structured student ZIPs
+are validated as one top-level project directory; source files and directly
+contained UML matches are imported separately, while invalid layouts remain
+available for manual review.
 
 Milestone JSON files provide the application’s dependency-injection data. The
 loader maps their contents to the typed `ConfigData` structure:

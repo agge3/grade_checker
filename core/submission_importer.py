@@ -48,11 +48,17 @@ class SubmissionImporter:
         output_root: str | Path,
         required_filename: str | None = None,
         optional_filenames: Iterable[str] = ("README.md",),
+        required_filenames: Iterable[str] | None = None,
+        structured_submissions: bool = False,
     ) -> None:
         self.archive_path = Path(archive_path)
         self.output_root = Path(output_root)
         self.required_filename = required_filename
         self.optional_filenames = frozenset(optional_filenames)
+        self.required_filenames = tuple(
+            required_filenames or ((required_filename,) if required_filename else ())
+        )
+        self.structured_submissions = structured_submissions
 
     def import_submissions(self) -> ImportResult:
         """Import every discoverable submission from the configured ZIP.
@@ -179,6 +185,10 @@ class SubmissionImporter:
         identifier = self._unique_name(preferred_name, used_names)
         workspace = self.output_root / "students" / identifier
         workspace.mkdir(parents=True, exist_ok=False)
+        if self.structured_submissions:
+            return self._import_structured_group(
+                archive, source_name, members, used_names, identifier, workspace
+            )
         source_root = workspace / "src-files"
         source_root.mkdir()
         warnings: list[str] = []
@@ -230,6 +240,253 @@ class SubmissionImporter:
             json.dump(metadata, file, indent=2)
         return Submission(identifier, source_name, str(self.archive_path), workspace,
                           tuple(copied), tuple(warnings), recovered)
+
+    def _import_structured_group(
+        self,
+        archive: ZipFile,
+        source_name: str,
+        members: list[str],
+        used_names: dict[str, int],
+        identifier: str,
+        workspace: Path,
+    ) -> Submission:
+        """Import a Milestone 2 ZIP with source files and UML artifacts.
+
+        :param archive: Open outer Canvas archive.
+        :param source_name: Canvas-generated name for the submission group.
+        :param members: Outer-archive members belonging to the student.
+        :param used_names: Allocated submission identifiers.
+        :param identifier: Normalized identifier assigned to this submission.
+        :param workspace: Destination student workspace.
+        :return: Imported submission record with layout warnings.
+        """
+        source_root = workspace / "src-files"
+        uml_root = workspace / "uml-diagrams"
+        source_root.mkdir()
+        uml_root.mkdir()
+        warnings: list[str] = []
+        copied: list[str] = []
+        uml_metadata: dict[str, object] = {
+            "status": "missing_directory",
+            "directory": None,
+            "class_files": [],
+            "sequence_files": [],
+            "files": [],
+        }
+
+        zip_members = [member for member in members if member.lower().endswith(".zip")]
+        if len(zip_members) != 1:
+            warnings.append("expected exactly one submitted ZIP file")
+            if not zip_members:
+                warnings.append("submission is not a ZIP and could not be structurally imported")
+            else:
+                warnings.append(f"multiple submitted ZIP files found: {zip_members}")
+            metadata = self._write_structured_metadata(
+                workspace, identifier, source_name, members, copied, warnings,
+                uml_metadata, self.required_filenames,
+            )
+            return Submission(identifier, source_name, str(self.archive_path), workspace,
+                              tuple(copied), tuple(warnings), False)
+
+        import io
+        with archive.open(zip_members[0]) as source:
+            data = io.BytesIO(source.read())
+        try:
+            with ZipFile(data) as submitted:
+                entries = self._safe_entries(submitted)
+                duplicate_paths = [
+                    name for name in dict.fromkeys(entries) if entries.count(name) > 1
+                ]
+                if duplicate_paths:
+                    warnings.append(f"duplicate ZIP entries found: {duplicate_paths}")
+                top_dirs = []
+                root_files = []
+                for name in entries:
+                    path = PurePosixPath(name)
+                    if len(path.parts) == 1:
+                        root_files.append(name)
+                    elif path.parts[0] not in top_dirs:
+                        top_dirs.append(path.parts[0])
+                if len(top_dirs) != 1:
+                    warnings.append(
+                        f"expected one top-level directory; found {top_dirs or 'none'}"
+                    )
+                    metadata = self._write_structured_metadata(
+                        workspace, identifier, source_name, members, copied,
+                        warnings, uml_metadata, self.required_filenames,
+                    )
+                    return Submission(identifier, source_name, str(self.archive_path), workspace,
+                                      tuple(copied), tuple(warnings), False)
+                project_dir = top_dirs[0]
+                if root_files:
+                    warnings.append(f"files outside the top-level directory: {root_files}")
+                direct_files = [
+                    name for name in entries
+                    if PurePosixPath(name).parts[:1] == (project_dir,)
+                    and len(PurePosixPath(name).parts) == 2
+                ]
+                allowed = {
+                    Path(name).name for name in (*self.required_filenames, *self.optional_filenames)
+                }
+                for name in direct_files:
+                    filename = PurePosixPath(name).name
+                    if filename not in allowed:
+                        warnings.append(f"additional root file '{filename}' was ignored")
+                        continue
+                    target = source_root / filename
+                    if target.exists():
+                        warnings.append(f"duplicate submitted file '{filename}' was ignored")
+                        continue
+                    with submitted.open(name) as source, target.open("wb") as destination:
+                        shutil.copyfileobj(source, destination)
+                    copied.append(filename)
+                for required in self.required_filenames:
+                    if Path(required).name not in copied:
+                        warnings.append(f"required file '{required}' was not found")
+
+                uml_dirs = [
+                    f"{project_dir}/{directory_name}"
+                    for directory_name in dict.fromkeys(
+                        PurePosixPath(name).parts[1]
+                        for name in entries
+                        if len(PurePosixPath(name).parts) >= 3
+                        and PurePosixPath(name).parts[0] == project_dir
+                    )
+                    if "uml" in directory_name.lower()
+                ]
+                selected_uml = uml_dirs[0] if uml_dirs else None
+                if len(uml_dirs) > 1:
+                    warnings.append(f"additional UML directories ignored: {uml_dirs[1:]}")
+                parent_matches = [
+                    name for name in direct_files
+                    if "uml" in PurePosixPath(name).name.lower()
+                    and ("class" in PurePosixPath(name).name.lower()
+                         or "sequence" in PurePosixPath(name).name.lower())
+                ]
+                if selected_uml:
+                    uml_metadata["directory"] = selected_uml
+                    uml_files = [
+                        name for name in entries
+                        if len(PurePosixPath(name).parts) == 3
+                        and PurePosixPath(name).parts[:2] == PurePosixPath(selected_uml).parts
+                    ]
+                    self._copy_uml_files(
+                        submitted, uml_files, uml_root, uml_metadata, warnings
+                    )
+                    if parent_matches:
+                        warnings.append(
+                            f"UML files outside the selected UML directory were ignored: {parent_matches}"
+                        )
+                else:
+                    fallback = parent_matches
+                    if fallback:
+                        warnings.append("UML files were found in the project root instead of an UML directory")
+                        uml_metadata["status"] = "fallback_files_outside_uml_directory"
+                        self._copy_uml_files(
+                            submitted, fallback, uml_root, uml_metadata, warnings
+                        )
+                    else:
+                        warnings.append("no UML directory or qualifying UML files were found")
+                if selected_uml and uml_metadata["status"] == "missing_directory":
+                    uml_metadata["status"] = "complete"
+                    class_files = uml_metadata["class_files"]
+                    sequence_files = uml_metadata["sequence_files"]
+                    if not class_files:
+                        uml_metadata["status"] = "missing_class"
+                    if not sequence_files:
+                        uml_metadata["status"] = "missing_sequence" if class_files else "missing_class_and_sequence"
+        except BadZipFile:
+            warnings.append("submitted ZIP is malformed")
+        self._write_structured_metadata(
+            workspace, identifier, source_name, members, copied, warnings, uml_metadata
+            , self.required_filenames
+        )
+        return Submission(identifier, source_name, str(self.archive_path), workspace,
+                          tuple(copied), tuple(warnings), False)
+
+    def _copy_uml_files(
+        self,
+        submitted: ZipFile,
+        members: list[str],
+        destination: Path,
+        uml_metadata: dict[str, object],
+        warnings: list[str],
+    ) -> None:
+        """Copy matching direct UML files and record their classifications.
+
+        :param submitted: Open student submission ZIP.
+        :param members: Direct UML file members to inspect.
+        :param destination: Student ``uml-diagrams`` directory.
+        :param uml_metadata: Mutable UML metadata record.
+        :param warnings: Mutable warning collection.
+        """
+        class_files = uml_metadata["class_files"]
+        sequence_files = uml_metadata["sequence_files"]
+        copied_files = uml_metadata["files"]
+        assert isinstance(class_files, list)
+        assert isinstance(sequence_files, list)
+        assert isinstance(copied_files, list)
+        for member in members:
+            filename = PurePosixPath(member).name
+            lowered = filename.lower()
+            is_class = "class" in lowered
+            is_sequence = "sequence" in lowered
+            if not is_class and not is_sequence:
+                warnings.append(f"additional UML-directory file '{filename}' was ignored")
+                continue
+            target = destination / filename
+            if target.exists():
+                warnings.append(f"duplicate UML filename '{filename}' was ignored")
+                continue
+            with submitted.open(member) as source, target.open("wb") as output:
+                shutil.copyfileobj(source, output)
+            copied_files.append(filename)
+            if is_class:
+                class_files.append(filename)
+            if is_sequence:
+                sequence_files.append(filename)
+            if is_class and is_sequence:
+                warnings.append(f"UML file '{filename}' matched both class and sequence")
+        if any(name in class_files for name in sequence_files):
+            uml_metadata["status"] = "one_file_matches_both"
+
+    @staticmethod
+    def _write_structured_metadata(
+        workspace: Path,
+        identifier: str,
+        source_name: str,
+        members: list[str],
+        copied: list[str],
+        warnings: list[str],
+        uml_metadata: dict[str, object],
+        required_files: Iterable[str],
+    ) -> dict[str, object]:
+        """Write metadata for a structured submission import.
+
+        :param workspace: Destination student workspace.
+        :param identifier: Normalized submission identifier.
+        :param source_name: Canvas-generated source name.
+        :param members: Outer-archive members for the submission.
+        :param copied: Copied source filenames.
+        :param warnings: Import warnings requiring review.
+        :param uml_metadata: UML discovery and classification metadata.
+        :return: Metadata written to disk.
+        """
+        metadata = {
+            "identifier": identifier,
+            "original_filename": source_name,
+            "source_members": members,
+            "files": copied,
+            "student_files": copied,
+            "required_files": [],
+            "warnings": warnings,
+            "uml": uml_metadata,
+        }
+        metadata["required_files"] = [Path(name).name for name in required_files]
+        (workspace / "submission_metadata.json").write_text(
+            json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
+        )
+        return metadata
 
     def _normalized_filename(self, filename: str) -> str:
         """Choose the normalized filename used by downstream grading.
