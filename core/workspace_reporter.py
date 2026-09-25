@@ -16,6 +16,11 @@ from collections.abc import Sequence
 from typing import Callable, Mapping, TypedDict
 
 from core.similarity import SimilarityAnalyzer, temporary_source_index
+from core.submission_names import (
+    display_submission_name,
+    format_submission_label,
+    load_submission_names,
+)
 
 
 class CriterionResult(TypedDict):
@@ -96,6 +101,7 @@ class WorkspaceReporter:
         )
         reports: list[Path] = []
         summary_rows: list[dict[str, object]] = []
+        submission_names = load_submission_names(self.workspace)
         students_root = self.workspace / "students"
         selected_submissions = (
             [submission] if isinstance(submission, str) else list(submission or [])
@@ -138,7 +144,8 @@ class WorkspaceReporter:
                         progress line.
                     """
                     print(
-                        f"Reporting {index}/{total} {submission_root.name}: "
+                        f"Reporting {index}/{total} "
+                        f"{format_submission_label(submission_root.name, submission_names)}: "
                         f"{self._colorize(status, 'cyan')}",
                         end="\r",
                         flush=True,
@@ -157,6 +164,9 @@ class WorkspaceReporter:
                 student_files = metadata.get("student_files", metadata.get("files", []))
                 summary_rows.append({
                     "submission": submission_root.name,
+                    "display_name": display_submission_name(
+                        submission_root.name, submission_names
+                    ),
                     "submission_status": self._submission_status(metadata),
                     "build_status": outcome["build_status"],
                     "runtime_status": outcome["runtime_status"],
@@ -170,7 +180,8 @@ class WorkspaceReporter:
                     "method_headers_expected": legacy_details["method_headers_expected"],
                 })
                 print(
-                    f"Reporting {index}/{total} {submission_root.name}: "
+                    f"Reporting {index}/{total} "
+                    f"{format_submission_label(submission_root.name, submission_names)}: "
                     f"build={self._colorize_status(str(outcome['build_status']))} "
                     f"runtime={self._colorize_status(str(outcome['runtime_status']))} "
                     f"report={self._colorize(self._display_workspace_path(report_path), 'blue')}",
@@ -313,7 +324,12 @@ class WorkspaceReporter:
         ]
         table_rows = [
             [
-                str(row["submission"]),
+                format_submission_label(
+                    str(row["submission"]),
+                    {str(row["submission"]): str(row["display_name"])}
+                    if row.get("display_name")
+                    else {},
+                ),
                 self._summary_status(str(row["submission_status"])),
                 self._summary_status(str(row["build_status"])),
                 self._summary_status(str(row["runtime_status"])),
@@ -1113,10 +1129,15 @@ class WorkspaceReporter:
         assert isinstance(legacy_details, dict)
         workflow_flags = outcome["workflow_flags"]
         assert isinstance(workflow_flags, dict)
+        workspace_root = Path(str(outcome["workspace_root"]))
+        identifier = str(metadata.get("identifier", report_path.parent.name))
+        display_name = display_submission_name(
+            identifier, load_submission_names(workspace_root)
+        )
         lines = [
             "Submission report", "=================",
             f"Workspace path prefix: {outcome['workspace_root']}",
-            f"Submission identifier: {metadata.get('identifier', report_path.parent.name)}",
+            f"Submission: {format_submission_label(identifier, {identifier: display_name})}",
             f"Original filename: {metadata.get('original_filename', '')}",
             f"Source archive: {metadata.get('source_archive', '')}",
             f"Student workspace: {WorkspaceReporter._display_report_path(outcome['workspace_root'], outcome['student_root'])}",

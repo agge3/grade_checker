@@ -11,6 +11,8 @@ import shutil
 from typing import Iterable, Mapping
 from zipfile import BadZipFile, ZipFile
 
+from core.submission_names import format_submission_label, load_submission_names, sync_submission_names
+
 
 @dataclass(frozen=True)
 class Submission:
@@ -94,6 +96,10 @@ class SubmissionImporter:
                     )
                 if not result.submissions:
                     result.warnings.append("The student-canvas-submissions contains no files.")
+                sync_submission_names(
+                    self.output_root,
+                    [submission.identifier for submission in result.submissions],
+                )
                 result.summary = self._write_import_summary(result)
                 return result
         except BadZipFile as error:
@@ -111,6 +117,7 @@ class SubmissionImporter:
         run_time = f"{local_now.strftime('%Y-%m-%d %H:%M:%S')} ({local_now.tzname() or 'local'})"
         rows: list[list[str]] = []
         warning_sections: list[tuple[str, tuple[str, ...]]] = []
+        names = load_submission_names(self.output_root)
         ordered_submissions = sorted(
             result.submissions,
             key=lambda submission: submission.identifier.casefold(),
@@ -127,7 +134,7 @@ class SubmissionImporter:
             uml_status = str(uml.get("status", "not applicable")) if isinstance(uml, dict) else "not applicable"
             status = "missing" if not file_names else "warning" if submission.warnings else "pass"
             rows.append([
-                submission.identifier,
+                format_submission_label(submission.identifier, names),
                 status,
                 f"{required_found}/{len(required_names)}" if required_names else "n/a",
                 uml_status,

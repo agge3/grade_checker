@@ -24,6 +24,7 @@ from core.workspace import Workspace, create_workspace as initialize_workspace
 from core.submission_importer import ImportResult, SubmissionImporter
 from core.teacher_importer import TeacherImportResult, TeacherImporter
 from core.workspace_reporter import WorkspaceReportResult, WorkspaceReporter
+from core.submission_names import format_submission_label, load_submission_names
 from core.similarity import SimilarityAnalyzer, temporary_source_index
 from core.report_index import (
     create_buildtime_log_index,
@@ -200,8 +201,12 @@ def _print_import_result(result: ImportResult) -> None:
         print(f"Student-canvas-submissions: {result.raw_archive}")
     if result.summary:
         print(f"Import summary: {result.summary}")
+    names = load_submission_names(result.summary.parent) if result.summary else {}
     for submission in result.submissions:
-        print(f"  {submission.identifier}: {submission.workspace}")
+        print(
+            f"  {format_submission_label(submission.identifier, names)}: "
+            f"{submission.workspace}"
+        )
         for warning in submission.warnings:
             print(f"    warning: {warning}")
     for warning in result.warnings:
@@ -365,7 +370,7 @@ def _select_submission_interactively(workspace: str | Path) -> list[str] | None:
         selection = input("Grade all submissions? [Y/n]: ").strip().lower()
         if not selection or selection in {"y", "yes"}:
             return None
-        return _select_submission_numbers(submissions)
+        return _select_submission_numbers(submissions, workspace)
     else:
         try:
             import questionary
@@ -373,7 +378,7 @@ def _select_submission_interactively(workspace: str | Path) -> list[str] | None:
             selection = input("Grade all submissions? [Y/n]: ").strip().lower()
             if not selection or selection in {"y", "yes"}:
                 return None
-            return _select_submission_numbers(submissions)
+            return _select_submission_numbers(submissions, workspace)
         grade_all = questionary.confirm(
             "Grade all submissions?", default=True
         ).ask()
@@ -382,7 +387,14 @@ def _select_submission_interactively(workspace: str | Path) -> list[str] | None:
         if grade_all:
             return None
         selected = questionary.checkbox(
-            "Select submissions to grade:", choices=submissions
+            "Select submissions to grade:",
+            choices=[
+                questionary.Choice(
+                    format_submission_label(item, load_submission_names(workspace)),
+                    value=item,
+                )
+                for item in submissions
+            ],
         ).ask()
         if selected is None:
             raise ValueError("Submission selection was cancelled.")
@@ -391,16 +403,20 @@ def _select_submission_interactively(workspace: str | Path) -> list[str] | None:
         return selected
 
 
-def _select_submission_numbers(submissions: list[str]) -> list[str]:
+def _select_submission_numbers(
+    submissions: list[str], workspace: str | Path
+) -> list[str]:
     """Select one or more submissions using comma-separated list numbers.
 
     :param submissions: Available normalized submission identifiers.
+    :param workspace: Grading workspace containing the mapping CSV.
     :return: Selected submission identifiers.
     :raises ValueError: If the selection is invalid.
     """
     print("Select submissions (comma-separated numbers):")
+    names = load_submission_names(workspace)
     for index, submission in enumerate(submissions, start=1):
-        print(f"  {index}. {submission}")
+        print(f"  {index}. {format_submission_label(submission, names)}")
     selection = input("Submission numbers: ").strip()
     if not selection:
         raise ValueError("Select at least one submission.")

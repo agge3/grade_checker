@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
+from core.submission_names import sync_submission_names
+
 
 WORKSPACE_DIRECTORIES = (
     "raw",
@@ -63,4 +65,5 @@ def create_workspace(
     with configuration_file.open("w", encoding="utf-8") as file:
         json.dump(metadata, file, indent=2)
         file.write("\n")
+    sync_submission_names(workspace_root, [])
     return Workspace(workspace_root, milestone, configuration_file)

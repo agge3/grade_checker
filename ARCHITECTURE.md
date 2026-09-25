@@ -62,7 +62,10 @@ submission rules are optional milestone configuration under
 `files` setting remains reserved for instructor/template files. The importer
 also writes the workspace-level `import-summary.md` with per-submission import
 statuses and manual-review warnings; the reporting workflow continues to own
-`report-summary.md`.
+`report-summary.md`. The workspace also contains the user-editable
+`submission-identifiers.csv` mapping from stable submission identifiers to
+optional human-readable names. Stable identifiers remain directory and
+command-line keys, while user-facing output uses mapped names when available.
 
 When reporting runs, `WorkspaceReporter` creates an isolated
 `build-workspaces/{identifier}/` directory. It copies the imported teacher

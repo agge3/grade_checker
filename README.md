@@ -121,6 +121,12 @@ Each import also writes `import-summary.md` at the workspace root. The summary
 lists the import status, required-file counts, UML status, copied-file counts,
 and manual-review warnings for every submission.
 
+The workspace also contains `submission-identifiers.csv` with the columns
+`submission_identifier,human_readable_name`. Fill in the second column to give
+submissions readable names. The Canvas-generated identifier remains the stable
+directory and command-line key, while user-facing import and reporting output
+uses the readable name when available.
+
 Legacy milestones continue to support the existing single-file recovery path.
 
 When Canvas exports multiple files submitted by the same student, the importer
