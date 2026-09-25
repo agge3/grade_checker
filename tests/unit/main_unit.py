@@ -197,7 +197,7 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertEqual(len(report_result.reports), 1)
             student_root = workspace / "students" / result.submissions[0].identifier
             self.assertTrue((student_root / "src-files" / "student.cpp").is_file())
-            self.assertEqual(report_result.summary.name, "summary.md")
+            self.assertEqual(report_result.summary.name, "report-summary.md")
             self.assertEqual(report_result.summary.parent, workspace)
             summary_text = report_result.summary.read_text(encoding="utf-8")
             self.assertIn("| Submission | Submission status |", summary_text)
@@ -331,7 +331,7 @@ class ReportIndexTests(unittest.TestCase):
             student_report = students / "student01" / "report.txt"
             student_report.parent.mkdir()
             student_report.write_text("grade", encoding="utf-8")
-            (workspace / "summary.md").write_text("summary", encoding="utf-8")
+            (workspace / "report-summary.md").write_text("summary", encoding="utf-8")
             (workspace / "similarity-report.txt").write_text("similarity", encoding="utf-8")
             index = create_report_index(workspace).directory
 
@@ -339,7 +339,7 @@ class ReportIndexTests(unittest.TestCase):
                 (index / "student01").read_text(encoding="utf-8"), "grade"
             )
             self.assertEqual(os.readlink(index / "student01"), "../students/student01/report.txt")
-            self.assertTrue((index / "summary.md").is_symlink())
+            self.assertTrue((index / "report-summary.md").is_symlink())
 
             student_report.unlink()
             create_report_index(workspace)

@@ -165,7 +165,7 @@ python3 main.py report
 It selects an initialized workspace, prepares each submission's build
 workspace at report time, and writes per-submission reports directly inside
 each `students/<submission>/` directory. The summary is written to
-`summary.md` at the workspace root and contains submission,
+`report-summary.md` at the workspace root and contains submission,
 build, and runtime statuses plus method and required-file counts. For scripted
 runs, provide the workspace directly. Each reporting command also writes a
 submission-only snapshot under `runs/`; `runs/summary-state.json` keeps the
@@ -211,7 +211,7 @@ python3 main.py generate-index-report \
 ```
 
 This creates `report-index/` by default, with one link per submission report
-plus links to `summary.md` and `similarity-report.txt` when those files exist.
+plus links to `report-summary.md` and `similarity-report.txt` when those files exist.
 Links are relative, so the workspace can be moved. Re-running the command
 refreshes existing symlinks and does not overwrite real files.
 
@@ -265,7 +265,7 @@ python3 main.py report \
 ```
 
 To run only the similarity analyzer, without rebuilding submissions or
-rewriting `summary.md`, use:
+rewriting `report-summary.md`, use:
 
 ```bash
 python3 main.py analyze-similarity \

@@ -192,7 +192,7 @@ def _report_targets(students_root: Path) -> list[tuple[str, Path]]:
     for report_path in sorted(students_root.glob("*/report.txt")):
         if report_path.is_file():
             report_targets.append((report_path.parent.name, report_path))
-    for filename in ("summary.md", "similarity-report.txt"):
+    for filename in ("report-summary.md", "similarity-report.txt"):
         report_path = students_root.parent / filename
         if report_path.is_file():
             report_targets.append((filename, report_path))

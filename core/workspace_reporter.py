@@ -205,7 +205,7 @@ class WorkspaceReporter:
             ),
             encoding="utf-8",
         )
-        summary = self.workspace / "summary.md"
+        summary = self.workspace / "report-summary.md"
         summary.write_text(
             self._write_summary(
                 cumulative_rows, run_time, "Grading Summary",

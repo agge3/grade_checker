@@ -62,7 +62,7 @@ submission rules are optional milestone configuration under
 `files` setting remains reserved for instructor/template files. The importer
 also writes the workspace-level `import-summary.md` with per-submission import
 statuses and manual-review warnings; the reporting workflow continues to own
-`summary.md`.
+`report-summary.md`.
 
 When reporting runs, `WorkspaceReporter` creates an isolated
 `build-workspaces/{identifier}/` directory. It copies the imported teacher
@@ -82,7 +82,7 @@ argument it offers initialized workspaces through a keyboard-navigable
 selection prompt. `WorkspaceReporter` prepares each submission's build
 workspace at report time, overlays student files on the teacher template, and
 writes per-submission reports directly under `students/{identifier}/`. The
-cumulative Markdown workspace summary is written to `summary.md` at the
+cumulative Markdown workspace summary is written to `report-summary.md` at the
 workspace root. Each invocation also writes a Markdown snapshot containing
 only the submissions processed by that invocation under `runs/`. The
 report command can process all submissions or one or more normalized submission
