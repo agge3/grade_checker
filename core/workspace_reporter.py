@@ -324,12 +324,7 @@ class WorkspaceReporter:
         ]
         table_rows = [
             [
-                format_submission_label(
-                    str(row["submission"]),
-                    {str(row["submission"]): str(row["display_name"])}
-                    if row.get("display_name")
-                    else {},
-                ),
+                str(row.get("display_name", row["submission"])),
                 self._summary_status(str(row["submission_status"])),
                 self._summary_status(str(row["build_status"])),
                 self._summary_status(str(row["runtime_status"])),

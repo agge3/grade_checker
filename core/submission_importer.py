@@ -11,7 +11,7 @@ import shutil
 from typing import Iterable, Mapping
 from zipfile import BadZipFile, ZipFile
 
-from core.submission_names import format_submission_label, load_submission_names, sync_submission_names
+from core.submission_names import display_submission_name, load_submission_names, sync_submission_names
 
 
 @dataclass(frozen=True)
@@ -134,7 +134,7 @@ class SubmissionImporter:
             uml_status = str(uml.get("status", "not applicable")) if isinstance(uml, dict) else "not applicable"
             status = "missing" if not file_names else "warning" if submission.warnings else "pass"
             rows.append([
-                format_submission_label(submission.identifier, names),
+                display_submission_name(submission.identifier, names),
                 status,
                 f"{required_found}/{len(required_names)}" if required_names else "n/a",
                 uml_status,
