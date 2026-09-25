@@ -184,10 +184,21 @@ class SubmissionImporter:
             path = PurePosixPath(info.filename)
             if info.is_dir():
                 continue
+            if self._is_os_metadata(path):
+                continue
             if path.is_absolute() or ".." in path.parts:
                 raise ValueError(f"Unsafe path in student-canvas-submissions: '{info.filename}'.")
             entries.append(info.filename)
         return entries
+
+    @staticmethod
+    def _is_os_metadata(path: PurePosixPath) -> bool:
+        """Identify filesystem metadata that should not affect imports.
+
+        :param path: Archive member path to inspect.
+        :return: ``True`` when the path is macOS or Finder metadata.
+        """
+        return "__MACOSX" in path.parts or path.name == ".DS_Store" or path.name.startswith("._")
 
     def _discover_groups(self, entries: list[str]) -> list[tuple[str, list[str]]]:
         """Group archive files into direct or nested submissions.
@@ -262,6 +273,10 @@ class SubmissionImporter:
         workspace = self.output_root / "students" / identifier
         workspace.mkdir(parents=True, exist_ok=False)
         if self.structured_submissions:
+            if not any(member.lower().endswith(".zip") for member in members):
+                return self._import_canvas_root_group(
+                    archive, source_name, members, used_names, identifier, workspace
+                )
             return self._import_structured_group(
                 archive, source_name, members, used_names, identifier, workspace
             )
@@ -316,6 +331,79 @@ class SubmissionImporter:
             json.dump(metadata, file, indent=2)
         return Submission(identifier, source_name, str(self.archive_path), workspace,
                           tuple(copied), tuple(warnings), recovered)
+
+    def _import_canvas_root_group(
+        self,
+        archive: ZipFile,
+        source_name: str,
+        members: list[str],
+        used_names: dict[str, int],
+        identifier: str,
+        workspace: Path,
+    ) -> Submission:
+        """Import files submitted directly at a Canvas submission root.
+
+        :param archive: Open outer Canvas archive.
+        :param source_name: Canvas-generated name for the submission group.
+        :param members: Direct outer-archive members belonging to the student.
+        :param used_names: Allocated submission identifiers.
+        :param identifier: Normalized identifier assigned to this submission.
+        :param workspace: Destination student workspace.
+        :return: Imported submission record with a no-ZIP warning.
+        """
+        source_root = workspace / "src-files"
+        uml_root = workspace / "uml-diagrams"
+        source_root.mkdir()
+        uml_root.mkdir()
+        warnings = [
+            "student submitted multiple files directly to the Canvas root; no ZIP was provided"
+        ]
+        copied: list[str] = []
+        uml_metadata: dict[str, object] = {
+            "status": "missing_uml_files",
+            "directory": None,
+            "class_files": [],
+            "sequence_files": [],
+            "files": [],
+        }
+        allowed = {
+            Path(name).name for name in (*self.required_filenames, *self.optional_filenames)
+        }
+        for member in members:
+            filename = PurePosixPath(member).name
+            lowered = filename.lower()
+            if "class" in lowered or "sequence" in lowered:
+                self._copy_uml_files(
+                    archive, [member], uml_root, uml_metadata, warnings
+                )
+                continue
+            normalized_name = self._normalized_filename(filename)
+            if normalized_name not in allowed:
+                warnings.append(f"additional Canvas-root file '{filename}' was ignored")
+                continue
+            target = source_root / normalized_name
+            if target.exists():
+                warnings.append(f"duplicate submitted file '{normalized_name}' was ignored")
+                continue
+            with archive.open(member) as source, target.open("wb") as destination:
+                shutil.copyfileobj(source, destination)
+            copied.append(normalized_name)
+        for required in self.required_filenames:
+            if Path(required).name not in copied:
+                warnings.append(f"required file '{required}' was not found")
+        class_files = uml_metadata["class_files"]
+        sequence_files = uml_metadata["sequence_files"]
+        if isinstance(class_files, list) and isinstance(sequence_files, list):
+            if class_files and sequence_files:
+                uml_metadata["status"] = "complete"
+            elif class_files or sequence_files:
+                uml_metadata["status"] = "missing_class_or_sequence"
+        self._write_structured_metadata(
+            workspace, identifier, source_name, members, copied, warnings,
+            uml_metadata, self.required_filenames,
+        )
+        return Submission(identifier, source_name, str(self.archive_path), workspace,
+                          tuple(copied), tuple(warnings), False)
 
     def _import_structured_group(
         self,
@@ -383,7 +471,24 @@ class SubmissionImporter:
                         root_files.append(name)
                     elif path.parts[0] not in top_dirs:
                         top_dirs.append(path.parts[0])
-                if len(top_dirs) != 1:
+                root_file_names = {PurePosixPath(name).name for name in root_files}
+                required_root_names = {
+                    Path(name).name for name in self.required_filenames
+                }
+                flat_uml_dirs = [
+                    directory for directory in top_dirs
+                    if "uml" in directory.lower()
+                ]
+                flat_layout = bool(
+                    required_root_names.intersection(root_file_names)
+                    and len(flat_uml_dirs) <= 1
+                )
+                if flat_layout:
+                    warnings.append(
+                        "submission has no single top-level project directory; "
+                        "imported using flat-layout fallback"
+                    )
+                if not flat_layout and len(top_dirs) != 1:
                     warnings.append(
                         f"expected one top-level directory; found {top_dirs or 'none'}"
                     )
@@ -393,10 +498,10 @@ class SubmissionImporter:
                     )
                     return Submission(identifier, source_name, str(self.archive_path), workspace,
                                       tuple(copied), tuple(warnings), False)
-                project_dir = top_dirs[0]
-                if root_files:
+                project_dir = None if flat_layout else top_dirs[0]
+                if root_files and not flat_layout:
                     warnings.append(f"files outside the top-level directory: {root_files}")
-                direct_files = [
+                direct_files = root_files if flat_layout else [
                     name for name in entries
                     if PurePosixPath(name).parts[:1] == (project_dir,)
                     and len(PurePosixPath(name).parts) == 2
@@ -420,7 +525,7 @@ class SubmissionImporter:
                     if Path(required).name not in copied:
                         warnings.append(f"required file '{required}' was not found")
 
-                uml_dirs = [
+                uml_dirs = flat_uml_dirs if flat_layout else [
                     f"{project_dir}/{directory_name}"
                     for directory_name in dict.fromkeys(
                         PurePosixPath(name).parts[1]
@@ -443,8 +548,12 @@ class SubmissionImporter:
                     uml_metadata["directory"] = selected_uml
                     uml_files = [
                         name for name in entries
-                        if len(PurePosixPath(name).parts) == 3
-                        and PurePosixPath(name).parts[:2] == PurePosixPath(selected_uml).parts
+                        if (
+                            len(PurePosixPath(name).parts)
+                            == (2 if flat_layout else 3)
+                        )
+                        and PurePosixPath(name).parts[:len(PurePosixPath(selected_uml).parts)]
+                        == PurePosixPath(selected_uml).parts
                     ]
                     self._copy_uml_files(
                         submitted, uml_files, uml_root, uml_metadata, warnings

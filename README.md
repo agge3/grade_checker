@@ -107,12 +107,15 @@ milestone configuration's `submission` section:
 }
 ```
 
-Milestone 2 student ZIPs must contain one top-level directory. Configured
-source files must be direct children of that directory. The importer copies
-matching source files to `src-files/`, warns about additional files, and
-copies direct UML matches into `uml-diagrams/` while preserving their names.
-Missing or misplaced UML files are retained as manual-review warnings in
-`submission_metadata.json`; they do not prevent source grading.
+Milestone 2 supports three submission formats. Direct Canvas files are
+imported with a no-ZIP warning; a ZIP with files at its archive root is
+imported with a flat-layout warning; and a ZIP with one top-level project
+directory is the preferred layout. Configured source files are copied to
+`src-files/`, direct UML matches are copied to `uml-diagrams/`, and additional
+files are warned about. Missing or misplaced UML files are retained as
+manual-review warnings in `submission_metadata.json`; they do not prevent
+source grading. macOS metadata such as `__MACOSX`, `.DS_Store`, and `._*`
+entries is ignored during layout detection.
 
 Each import also writes `import-summary.md` at the workspace root. The summary
 lists the import status, required-file counts, UML status, copied-file counts,

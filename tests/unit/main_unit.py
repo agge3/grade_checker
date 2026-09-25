@@ -256,6 +256,66 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertIn("# Import Summary", summary_text)
             self.assertIn("| student    | warning", summary_text)
             self.assertIn("additional UML-directory file 'notes.txt' was ignored", summary_text)
+
+    def test_structured_submission_accepts_flat_layout_with_warning(self) -> None:
+        """Ensure a root-level source/UML layout remains importable for review."""
+        from core.submission_importer import SubmissionImporter
+        from zipfile import ZipFile
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            inner = root / "student.zip"
+            with ZipFile(inner, "w") as submitted:
+                submitted.writestr("hash_table.cpp", "source")
+                submitted.writestr("UML-Diagrams/ClassDiagram.png", "class")
+                submitted.writestr("UML-Diagrams/SequenceDiagram.png", "sequence")
+            outer = root / "submissions.zip"
+            with ZipFile(outer, "w") as archive:
+                archive.write(inner, "student.zip")
+
+            result = SubmissionImporter(
+                outer,
+                root / "workspace",
+                required_filename="hash_table.cpp",
+                required_filenames=("hash_table.cpp",),
+                optional_filenames=(),
+                structured_submissions=True,
+            ).import_submissions()
+            student = result.submissions[0].workspace
+            self.assertTrue((student / "src-files/hash_table.cpp").is_file())
+            self.assertTrue((student / "uml-diagrams/ClassDiagram.png").is_file())
+            self.assertIn(
+                "submission has no single top-level project directory; imported using flat-layout fallback",
+                result.submissions[0].warnings,
+            )
+
+    def test_structured_submission_imports_canvas_root_files_without_zip(self) -> None:
+        """Ensure direct Canvas files import with a format warning and UML matches."""
+        from core.submission_importer import SubmissionImporter
+        from zipfile import ZipFile
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outer = root / "submissions.zip"
+            with ZipFile(outer, "w") as archive:
+                archive.writestr("student_1_hash_table.cpp", "source")
+                archive.writestr("student_1_class.png", "class")
+                archive.writestr("student_1_sequence.png", "sequence")
+                archive.writestr("student_1_._hash_table.cpp", "metadata")
+
+            result = SubmissionImporter(
+                outer,
+                root / "workspace",
+                required_filename="hash_table.cpp",
+                required_filenames=("hash_table.cpp",),
+                optional_filenames=(),
+                structured_submissions=True,
+            ).import_submissions()
+            student = result.submissions[0].workspace
+            self.assertTrue((student / "src-files/hash_table.cpp").is_file())
+            self.assertTrue((student / "uml-diagrams/student_1_class.png").is_file())
+            self.assertTrue((student / "uml-diagrams/student_1_sequence.png").is_file())
+            self.assertIn("no ZIP was provided", result.submissions[0].warnings[0])
 class ReportIndexTests(unittest.TestCase):
     """Verify report indexes expose generated reports without copying them."""
 
