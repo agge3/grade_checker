@@ -144,9 +144,10 @@ class WorkspaceReporter:
                         progress line.
                     """
                     print(
-                        f"Reporting {index}/{total} "
-                        f"{format_submission_label(submission_root.name, submission_names)}: "
-                        f"{self._colorize(status, 'cyan')}",
+                        self._report_status_prefix(
+                            index, total, submission_root.name, submission_names
+                        )
+                        + f"{self._colorize(status, 'cyan')}",
                         end="\r",
                         flush=True,
                     )
@@ -180,8 +181,7 @@ class WorkspaceReporter:
                     "method_headers_expected": legacy_details["method_headers_expected"],
                 })
                 print(
-                    f"Reporting {index}/{total} "
-                    f"{format_submission_label(submission_root.name, submission_names)}: "
+                    f"{self._report_status_prefix(index, total, submission_root.name, submission_names)}"
                     f"build={self._colorize_status(str(outcome['build_status']))} "
                     f"runtime={self._colorize_status(str(outcome['runtime_status']))} "
                     f"report={self._colorize(self._display_workspace_path(report_path), 'blue')}",
@@ -1113,6 +1113,29 @@ class WorkspaceReporter:
         if not candidates:
             candidates = [path for path in build_dir.rglob("*") if path.is_file() and path.stem == target_name]
         return sorted(candidates)[0] if candidates else None
+
+    @staticmethod
+    def _report_status_prefix(
+        index: int,
+        total: int,
+        identifier: str,
+        names: dict[str, str],
+    ) -> str:
+        """Format the fixed-width prefix used by report progress messages.
+
+        :param index: One-based index of the submission currently being
+            reported.
+        :param total: Total number of submissions in the report operation.
+        :param identifier: Stable normalized submission identifier.
+        :param names: Workspace mapping of identifiers to display names.
+        :return: Progress counter and padded name/identifier fields.
+        """
+        display_name = display_submission_name(identifier, names)
+        return (
+            f"Reporting {index:3d}/{total} "
+            f"{display_name:<24} "
+            f"{f'[{identifier}]':<24}: "
+        )
 
     @staticmethod
     def _write_report(report_path: Path, outcome: dict[str, object]) -> None:
