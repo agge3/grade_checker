@@ -126,6 +126,37 @@ class TeacherImportTests(unittest.TestCase):
 class WorkspaceReportTests(unittest.TestCase):
     """Verify reporting prepares isolated teacher-template build workspaces."""
 
+    def test_method_search_parses_cpp_structure(self) -> None:
+        """Recognize flexible method syntax without matching comments or strings."""
+        from core.workspace_reporter import WorkspaceReporter
+
+        with tempfile.TemporaryDirectory() as directory:
+            source_file = Path(directory) / "student.cpp"
+            source_file.write_text(
+                """
+                class Widget {
+                public:
+                    int inlineMethod(
+                        int value
+                    ) const { return value; }
+                };
+
+                // Widget::commentOnly() should not count.
+                const char* text = "Widget::stringOnly()";
+                int Widget ::
+                    splitDefinition(int value)
+                    { return value; }
+                """,
+                encoding="utf-8",
+            )
+
+            matches = WorkspaceReporter._parse_cpp_methods([source_file])
+
+            self.assertIn(("Widget", "inlineMethod"), matches)
+            self.assertIn(("Widget", "splitDefinition"), matches)
+            self.assertNotIn(("Widget", "commentOnly"), matches)
+            self.assertNotIn(("Widget", "stringOnly"), matches)
+
     def test_expected_output_classifies_exact_blank_line_and_content_differences(self) -> None:
         """Classify runtime output against the TA reference by difference type."""
         from core.workspace_reporter import WorkspaceReporter

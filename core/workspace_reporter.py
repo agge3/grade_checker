@@ -42,6 +42,24 @@ class WorkspaceReportResult:
     similarity_report: Path
 
 
+@dataclass(frozen=True)
+class _CppMethodMatch:
+    """Represent a method-like declaration found by the source parser."""
+
+    class_name: str
+    method_name: str
+    line_number: int
+    source_file: Path
+
+
+@dataclass(frozen=True)
+class _CppToken:
+    """Represent a significant C++ token and its source line."""
+
+    value: str
+    line_number: int
+
+
 class WorkspaceReporter:
     """Build and report on every normalized submission in a workspace.
 
@@ -802,10 +820,7 @@ class WorkspaceReporter:
         methods: dict[str, list[str]] = {}
         method_headers: dict[str, list[str]] = {}
         configured_methods = configuration.get("methods", {})
-        source_text = "\n".join(
-            path.read_text(encoding="utf-8", errors="replace")
-            for path in student_source_files
-        )
+        method_matches = self._parse_cpp_methods(student_source_files)
         if isinstance(configured_methods, Mapping):
             for clazz, class_methods in configured_methods.items():
                 if not isinstance(clazz, str) or not isinstance(class_methods, Mapping):
@@ -816,10 +831,17 @@ class WorkspaceReporter:
                     if not isinstance(method_name, str):
                         continue
                     qualified = f"{clazz}::{method_name}"
-                    status = "FOUND" if qualified in source_text else "MISSING"
+                    status = (
+                        "FOUND"
+                        if (clazz, method_name) in method_matches
+                        else "MISSING"
+                    )
                     results.append(f"{status}: {qualified}")
                     header_content = self._method_header_content(
-                        student_source_files, clazz, method_name
+                        student_source_files,
+                        clazz,
+                        method_name,
+                        method_matches,
                     )
                     if header_content is None:
                         header_results.append(f"MISSING method header: {qualified}")
@@ -888,7 +910,10 @@ class WorkspaceReporter:
 
     @staticmethod
     def _method_header_content(
-        source_files: list[Path], clazz: str, method_name: str
+        source_files: list[Path],
+        clazz: str,
+        method_name: str,
+        method_matches: dict[tuple[str, str], list[_CppMethodMatch]] | None = None,
     ) -> str | None:
         """Return the preceding documentation for a method implementation.
 
@@ -898,15 +923,17 @@ class WorkspaceReporter:
         :return: Comment content when a matching implementation is documented,
             otherwise ``None``.
         """
-        pattern = re.compile(
-            rf"\b(?:{re.escape(clazz)}\s*::\s*)?{re.escape(method_name)}\s*\("
-        )
+        matches = method_matches or WorkspaceReporter._parse_cpp_methods(source_files)
         for source_file in source_files:
             lines = source_file.read_text(
                 encoding="utf-8", errors="replace"
             ).splitlines()
             for index, line in enumerate(lines):
-                if not pattern.search(line):
+                if not any(
+                    match.line_number == index + 1
+                    and match.source_file == source_file
+                    for match in matches.get((clazz, method_name), [])
+                ):
                     continue
                 previous = index - 1
                 while previous >= 0 and not lines[previous].strip():
@@ -934,6 +961,184 @@ class WorkspaceReporter:
                         cursor -= 1
                     return "\n".join(reversed(comment_lines))
         return None
+
+    @staticmethod
+    def _parse_cpp_methods(
+        source_files: list[Path],
+    ) -> dict[tuple[str, str], list[_CppMethodMatch]]:
+        """Parse configured-looking C++ methods from source files.
+
+        :param source_files: C and C++ source files to inspect.
+        :return: Matches keyed by unqualified class and method names.
+        :raises OSError: If a source file cannot be read.
+
+        This intentionally provides the small subset of parsing needed by the
+        report: it tracks class bodies, qualified names, balanced parentheses,
+        and declaration/definition terminators. Comments and literals are
+        masked before tokenization, so text resembling a method does not count.
+        """
+        matches: dict[tuple[str, str], list[_CppMethodMatch]] = {}
+        for source_file in source_files:
+            source = source_file.read_text(encoding="utf-8", errors="replace")
+            tokens = WorkspaceReporter._tokenize_cpp(source)
+            class_ranges = WorkspaceReporter._class_ranges(tokens)
+            for index, token in enumerate(tokens):
+                if token.value != "(" or index == 0:
+                    continue
+                method_token = tokens[index - 1]
+                if not re.fullmatch(r"[A-Za-z_]\w*", method_token.value):
+                    continue
+                close_index = WorkspaceReporter._matching_token(
+                    tokens, index, "(", ")"
+                )
+                if close_index is None:
+                    continue
+                qualifier = WorkspaceReporter._qualified_class_before(
+                    tokens, index - 1
+                )
+                enclosing_class = next(
+                    (
+                        class_name
+                        for start, end, class_name in sorted(
+                            class_ranges, reverse=True
+                        )
+                        if start < index < end
+                        and WorkspaceReporter._is_class_member(tokens, start, index)
+                    ),
+                    None,
+                )
+                class_name = qualifier or enclosing_class
+                if class_name is None or not WorkspaceReporter._looks_like_method(
+                    tokens, close_index
+                ):
+                    continue
+                match = _CppMethodMatch(
+                    class_name=class_name,
+                    method_name=method_token.value,
+                    line_number=method_token.line_number,
+                    source_file=source_file,
+                )
+                matches.setdefault((class_name, method_token.value), []).append(match)
+        return matches
+
+    @staticmethod
+    def _tokenize_cpp(source: str) -> list[_CppToken]:
+        """Tokenize C++ while preserving lines and hiding comments/literals.
+
+        :param source: C++ source text to tokenize.
+        :return: Significant tokens with one-based source line numbers.
+        """
+        masked = re.sub(
+            r"//[^\n]*|/\*.*?\*/|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'",
+            lambda match: re.sub(r"[^\n]", " ", match.group(0)),
+            source,
+            flags=re.DOTALL,
+        )
+        token_pattern = re.compile(r"[A-Za-z_]\w*|::|[^\sA-Za-z_]", re.MULTILINE)
+        return [
+            _CppToken(match.group(0), masked.count("\n", 0, match.start()) + 1)
+            for match in token_pattern.finditer(masked)
+        ]
+
+    @staticmethod
+    def _matching_token(
+        tokens: list[_CppToken], start: int, opening: str, closing: str
+    ) -> int | None:
+        """Find the balanced closing token for a token at ``start``.
+
+        :param tokens: Token stream being searched.
+        :param start: Index of the opening delimiter.
+        :param opening: Opening delimiter value.
+        :param closing: Closing delimiter value.
+        :return: Closing delimiter index, or ``None`` for an unbalanced stream.
+        """
+        depth = 0
+        for index in range(start, len(tokens)):
+            if tokens[index].value == opening:
+                depth += 1
+            elif tokens[index].value == closing:
+                depth -= 1
+                if depth == 0:
+                    return index
+        return None
+
+    @staticmethod
+    def _class_ranges(
+        tokens: list[_CppToken],
+    ) -> list[tuple[int, int, str]]:
+        """Return token ranges occupied by class and struct bodies.
+
+        :param tokens: Token stream being searched.
+        :return: Start index, end index, and class name for each class body.
+        """
+        ranges: list[tuple[int, int, str]] = []
+        for index, token in enumerate(tokens):
+            if token.value not in {"class", "struct"} or index + 1 >= len(tokens):
+                continue
+            name = tokens[index + 1].value
+            if not re.fullmatch(r"[A-Za-z_]\w*", name):
+                continue
+            brace = next(
+                (candidate for candidate in range(index + 2, len(tokens))
+                 if tokens[candidate].value == "{"),
+                None,
+            )
+            if brace is None:
+                continue
+            end = WorkspaceReporter._matching_token(tokens, brace, "{", "}")
+            if end is not None:
+                ranges.append((brace, end, name))
+        return ranges
+
+    @staticmethod
+    def _qualified_class_before(
+        tokens: list[_CppToken], method_index: int
+    ) -> str | None:
+        """Read the class name immediately qualifying a method token.
+
+        :param tokens: Token stream being searched.
+        :param method_index: Index of the method-name token.
+        :return: The final qualified class component, or ``None``.
+        """
+        if method_index < 2 or tokens[method_index - 1].value != "::":
+            return None
+        class_token = tokens[method_index - 2].value
+        return class_token if re.fullmatch(r"[A-Za-z_]\w*", class_token) else None
+
+    @staticmethod
+    def _is_class_member(
+        tokens: list[_CppToken], class_start: int, token_index: int
+    ) -> bool:
+        """Determine whether a token is at the direct member level of a class.
+
+        :param tokens: Token stream being searched.
+        :param class_start: Index of the class body's opening brace.
+        :param token_index: Index of the candidate method token.
+        :return: ``True`` when no nested brace is open at the candidate.
+        """
+        nested_braces = 0
+        for token in tokens[class_start + 1:token_index]:
+            if token.value == "{":
+                nested_braces += 1
+            elif token.value == "}" and nested_braces:
+                nested_braces -= 1
+        return nested_braces == 0
+
+    @staticmethod
+    def _looks_like_method(tokens: list[_CppToken], close_index: int) -> bool:
+        """Check whether a parenthesized token sequence has declaration syntax.
+
+        :param tokens: Token stream being searched.
+        :param close_index: Index of the closing parameter delimiter.
+        :return: ``True`` for a declaration or definition terminator.
+        """
+        index = close_index + 1
+        allowed = {"const", "noexcept", "override", "final", "&", "&&"}
+        while index < len(tokens) and tokens[index].value in allowed:
+            index += 1
+        if index >= len(tokens):
+            return False
+        return tokens[index].value in {"{", ";", "=", ":", "->"}
 
     @staticmethod
     def _file_header_content(source_file: Path) -> str | None:
