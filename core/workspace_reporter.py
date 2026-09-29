@@ -943,7 +943,10 @@ class WorkspaceReporter:
                 if lines[previous].strip().startswith("//"):
                     return lines[previous].strip()
                 if "*/" in lines[previous]:
-                    comment_lines = [lines[previous].strip()]
+                    comment_line = lines[previous].strip()
+                    if "/*" in comment_line:
+                        return comment_line
+                    comment_lines = [comment_line]
                     cursor = previous - 1
                     while cursor >= 0:
                         comment_lines.append(lines[cursor].strip())

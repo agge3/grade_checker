@@ -157,6 +157,32 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertNotIn(("Widget", "commentOnly"), matches)
             self.assertNotIn(("Widget", "stringOnly"), matches)
 
+    def test_method_header_does_not_include_previous_implementation(self) -> None:
+        """Keep one-line method documentation separate from prior method bodies."""
+        from core.workspace_reporter import WorkspaceReporter
+
+        with tempfile.TemporaryDirectory() as directory:
+            source_file = Path(directory) / "hash_table.cpp"
+            source_file.write_text(
+                """
+                int HashTable::getTable() {
+                    return 0;
+                }
+
+                /** @brief Returns the number of buckets. */
+                int HashTable::getSize() {
+                    return 10;
+                }
+                """,
+                encoding="utf-8",
+            )
+
+            header = WorkspaceReporter._method_header_content(
+                [source_file], "HashTable", "getSize"
+            )
+
+            self.assertEqual(header, "/** @brief Returns the number of buckets. */")
+
     def test_expected_output_classifies_exact_blank_line_and_content_differences(self) -> None:
         """Classify runtime output against the TA reference by difference type."""
         from core.workspace_reporter import WorkspaceReporter
