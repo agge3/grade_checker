@@ -454,6 +454,25 @@ class ReportIndexTests(unittest.TestCase):
                 "../students/student02/build-output.log",
             )
 
+    def test_file_index_links_submission_directories(self) -> None:
+        """Ensure a requested submission directory can be indexed."""
+        from core.report_index import create_file_index
+
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "workspace"
+            student_directory = workspace / "students" / "student01" / "uml-diagrams"
+            student_directory.mkdir(parents=True)
+            (workspace / "workspace.json").write_text("{}", encoding="utf-8")
+            (student_directory / "class.png").write_text("diagram", encoding="utf-8")
+
+            index = create_file_index(workspace, "uml-diagrams").directory
+
+            self.assertTrue((index / "student01").is_symlink())
+            self.assertEqual(
+                os.readlink(index / "student01"),
+                "../students/student01/uml-diagrams",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

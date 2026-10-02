@@ -224,8 +224,8 @@ Use `--name-by mapped` to use `submission-identifiers.csv` display names for
 submission links. Add `--include-extension` to append the original target
 extension to each link name.
 
-The general index command accepts a filepath relative to each student's
-directory:
+The general index command accepts a file or directory path relative to each
+student's directory:
 
 ```bash
 python3 main.py generate-index notes.md \
@@ -234,9 +234,10 @@ python3 main.py generate-index notes.md \
 
 It can also be supplied with `--file` (or `--filepath`). With no filepath, the
 interactive command offers standard report files (`report.txt`, both logs,
-`notes.md`, and `overrides.json`) plus configured required student submission
-files. Required student files are linked from each student's `src-files/`
-directory.
+`notes.md`, and `overrides.json`), directories found in student submissions
+(such as `src-files/` and `uml-diagrams/`), and configured required student
+submission files. Required student files are linked from each student's
+`src-files/` directory.
 All index commands accept `--name-by identifier` (the default) or
 `--name-by mapped`. Add `--include-extension` when link names should include
 the original target extension, such as `Ada Lovelace.cpp` or

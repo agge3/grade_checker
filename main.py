@@ -808,7 +808,7 @@ def report_index(arguments: Sequence[str]) -> int:
 
 
 def _index_file_choices(workspace: str | Path) -> list[str]:
-    """Collect standard report files and required student files.
+    """Collect standard report paths and submitted student directories.
 
     :param workspace: Initialized grading workspace to inspect.
     :return: Unique relative paths suitable for the index prompt.
@@ -822,6 +822,12 @@ def _index_file_choices(workspace: str | Path) -> list[str]:
     ]
     students_root = Path(workspace).expanduser() / "students"
     if students_root.is_dir():
+        for student_root in sorted(
+            path for path in students_root.iterdir() if path.is_dir()
+        ):
+            choices.extend(
+                path.name for path in student_root.iterdir() if path.is_dir()
+            )
         for metadata_path in sorted(students_root.glob("*/submission_metadata.json")):
             try:
                 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -837,7 +843,7 @@ def _index_file_choices(workspace: str | Path) -> list[str]:
 
 
 def _select_index_file_interactively(workspace: str | Path) -> str:
-    """Ask which standard or required file should be indexed.
+    """Ask which standard file or student directory should be indexed.
 
     :param workspace: Initialized grading workspace to inspect.
     :return: Selected filepath relative to each report directory.
@@ -849,11 +855,11 @@ def _select_index_file_interactively(workspace: str | Path) -> str:
     except ImportError:
         questionary = None
     if questionary is not None and sys.stdin.isatty() and sys.stdout.isatty():
-        selected = questionary.select("File to index:", choices=choices).ask()
+        selected = questionary.select("File or directory to index:", choices=choices).ask()
         if selected is None:
             raise ValueError("File selection was cancelled.")
         return selected
-    print("Select a file to index:")
+    print("Select a file or directory to index:")
     for index, choice in enumerate(choices, start=1):
         print(f"  {index}. {choice}")
     selection = input("File number: ").strip()
@@ -877,7 +883,7 @@ def _index_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "filepath_arg", nargs="?",
-        help="Path relative to each report directory; prompts if omitted",
+        help="File or directory path relative to each student directory; prompts if omitted",
     )
     parser.add_argument(
         "--workspace",

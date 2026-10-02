@@ -26,12 +26,12 @@ def create_file_index(
     name_mode: str = "identifier",
     include_extension: bool = False,
 ) -> ReportIndexResult:
-    """Create relative symlinks for one file from every submission.
+    """Create relative symlinks for one path from every submission.
 
     :param workspace: Initialized grading workspace containing student records.
-    :param filepath: Non-empty relative path to resolve from each report
-        directory. A configured required student file may instead be resolved
-        from the matching submission directory.
+    :param filepath: Non-empty relative file or directory path to resolve from
+        each student directory. A configured required student file may instead
+        be resolved from the matching submission directory.
     :param output: Directory in which to create the index. When omitted, the
         index is created at ``<workspace>/<filename>-index``.
     :param name_mode: Use ``identifier`` or ``mapped`` for submission link
@@ -39,7 +39,7 @@ def create_file_index(
     :param include_extension: Append the original target file extension to
         submission link names when true.
     :return: The index directory and the links created there.
-    :raises ValueError: If filepath is absolute, empty, or escapes its report
+    :raises ValueError: If filepath is absolute, empty, or escapes its student
         directory.
     :raises FileNotFoundError: If the workspace is not initialized or its
         students directory does not exist.
@@ -295,7 +295,7 @@ def _submission_log_targets(
 def _file_targets(
     students_root: Path, relative_path: Path
 ) -> list[tuple[str, Path]]:
-    """Resolve one requested file for every report and submission.
+    """Resolve one requested file or directory for every submission.
 
     :param students_root: Workspace students directory.
     :param relative_path: Path relative to each student directory.
@@ -304,7 +304,7 @@ def _file_targets(
     targets: list[tuple[str, Path]] = []
     for student_root in sorted(path for path in students_root.iterdir() if path.is_dir()):
         report_target = student_root / relative_path
-        if report_target.is_file():
+        if report_target.is_file() or report_target.is_dir():
             targets.append((student_root.name, report_target))
             continue
         metadata_path = student_root / "submission_metadata.json"
@@ -319,6 +319,6 @@ def _file_targets(
             str(item) for item in required_files if isinstance(item, str)
         }:
             submission_target = student_root / "src-files" / relative_path
-            if submission_target.is_file():
+            if submission_target.is_file() or submission_target.is_dir():
                 targets.append((student_root.name, submission_target))
     return targets
