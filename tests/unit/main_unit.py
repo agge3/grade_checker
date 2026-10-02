@@ -231,7 +231,14 @@ class WorkspaceReportTests(unittest.TestCase):
             root = Path(directory)
             workspace = root / "workspace"
             workspace.mkdir()
-            (workspace / "workspace.json").write_text("{}", encoding="utf-8")
+            (workspace / "workspace.json").write_text(
+                json.dumps({"milestone": "milestone2"}), encoding="utf-8"
+            )
+            (workspace / "submission-identifiers.csv").write_text(
+                "submission_identifier,human_readable_name\n"
+                "student,Ada Lovelace\n",
+                encoding="utf-8",
+            )
             template_root = workspace / "references/template"
             template_root.mkdir(parents=True)
             (template_root / "CMakeLists.txt").write_text("template", encoding="utf-8")
@@ -257,9 +264,9 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertEqual(report_result.summary.name, "report-summary.md")
             self.assertEqual(report_result.summary.parent, workspace)
             summary_text = report_result.summary.read_text(encoding="utf-8")
-            self.assertIn("| Submission | Submission status |", summary_text)
+            self.assertIn("| Submission", summary_text)
             self.assertIn("Methods found (expected:", summary_text)
-            self.assertIn("| student    |", summary_text)
+            self.assertIn("| Ada Lovelace |", summary_text)
             report_text = report_result.reports[0].read_text(encoding="utf-8")
             self.assertIn(f"Workspace path prefix: {workspace}", report_text)
             self.assertIn("<workspace-path>/students/student/build-output.log", report_text)
@@ -274,6 +281,8 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertNotIn("Runtime Output", report_text)
             notes = workspace / "students" / result.submissions[0].identifier / "notes.md"
             notes_text = notes.read_text(encoding="utf-8")
+            self.assertIn("# TA Notes: Ada Lovelace — Milestone 2", notes_text)
+            self.assertIn("> [!INFO]- About TA notes", notes_text)
             self.assertIn("different from `report.txt`", notes_text)
 
     def test_structured_submission_imports_source_and_uml_files(self) -> None:

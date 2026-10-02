@@ -292,7 +292,9 @@ The standalone command writes `similarity-report.txt` at the workspace root and 
 the repository's default `CodeAnalyzer.cpp` when `--code-analyzer` is omitted.
 
 Each submission report directory includes a guided `notes.md` for TA-written
-observations. The generated `report.txt` contains automated findings and
+observations. Its title identifies the mapped student name and milestone when
+the notes are created. Its instructional template is a collapsed info callout.
+The generated `report.txt` contains automated findings and
 evidence, including file-header, configured-method, and method-documentation details, GTest/extra-credit
 configuration status, and output-check status. Full build and runtime output
 remain available in the linked log files.
