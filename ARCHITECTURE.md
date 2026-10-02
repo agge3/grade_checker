@@ -114,11 +114,19 @@ create relative symlinks under `<workspace>/report-index` for each
 report when present. Existing symlinks are refreshed; real files are never
 overwritten.
 
-The general `generate-index` command accepts a filepath relative to each
-submission report directory and creates a relative symlink for each existing
-match under `<workspace>/<filename>-index`. Required student files are resolved from the
-matching student's `src-files/` directory. The interactive command offers the
-standard report files and required files recorded in submission metadata.
+The general `generate-index` command accepts one or more filepaths relative to
+each submission report directory and creates relative symlinks for each
+existing match. A single filepath uses `<workspace>/<filename>-index`; a
+multi-file invocation uses `<workspace>/index` by default and appends each
+original filename to the submission identifier to keep links distinct.
+The optional `--group-by-submission` layout instead creates one directory per
+submission, named by the selected identifier or mapped name, with the original
+target filenames as links inside it.
+Required student files are resolved from the matching student's `src-files/`
+directory. The interactive command offers the standard report files and
+required files recorded in submission metadata through a multi-select prompt.
+For multiple interactive selections, grouping is prompted separately before
+the mapped-name and extension choices.
 Index commands support identifier-based or mapped-name link labels, with an
 option to append the original target file extension to submission link names.
 Interactive invocations expose both choices through a multi-select prompt.

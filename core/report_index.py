@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 import json
 
 from core.submission_names import load_submission_names
@@ -21,23 +21,28 @@ class ReportIndexResult:
 
 def create_file_index(
     workspace: str | Path,
-    filepath: str,
+    filepath: str | Sequence[str],
     output: str | Path | None = None,
     name_mode: str = "identifier",
     include_extension: bool = False,
+    group_by_submission: bool = False,
 ) -> ReportIndexResult:
-    """Create relative symlinks for one path from every submission.
+    """Create relative symlinks for one or more paths from every submission.
 
     :param workspace: Initialized grading workspace containing student records.
-    :param filepath: Non-empty relative file or directory path to resolve from
-        each student directory. A configured required student file may instead
-        be resolved from the matching submission directory.
-    :param output: Directory in which to create the index. When omitted, the
-        index is created at ``<workspace>/<filename>-index``.
+    :param filepath: Non-empty relative file or directory path, or a sequence
+        of paths, to resolve from each student directory. A configured
+        required student file may instead be resolved from the matching
+        submission directory.
+    :param output: Directory in which to create the index. When omitted, a
+        single filepath uses ``<workspace>/<filename>-index`` and multiple
+        filepaths use ``<workspace>/index``.
     :param name_mode: Use ``identifier`` or ``mapped`` for submission link
         names.
     :param include_extension: Append the original target file extension to
         submission link names when true.
+    :param group_by_submission: Place multi-file links under a directory named
+        for each submission instead of using flat, prefixed link names.
     :return: The index directory and the links created there.
     :raises ValueError: If filepath is absolute, empty, or escapes its student
         directory.
@@ -47,18 +52,39 @@ def create_file_index(
         directory.
     :raises OSError: If a symlink cannot be created or removed.
     """
-    relative_path = Path(filepath)
-    if not filepath.strip() or relative_path.is_absolute() or ".." in relative_path.parts:
-        raise ValueError("Indexed filepath must be a non-empty path relative to each report directory.")
+    filepaths = [filepath] if isinstance(filepath, str) else list(filepath)
+    if not filepaths:
+        raise ValueError("At least one indexed filepath is required.")
+    relative_paths: list[Path] = []
+    for filepath_value in dict.fromkeys(filepaths):
+        relative_path = Path(filepath_value)
+        if (
+            not filepath_value.strip()
+            or relative_path.is_absolute()
+            or ".." in relative_path.parts
+        ):
+            raise ValueError(
+                "Indexed filepath must be a non-empty path relative to each report directory."
+            )
+        relative_paths.append(relative_path)
+    multiple_files = len(relative_paths) > 1
     return _create_index(
         workspace,
         output,
-        source_description=f"file '{filepath}'",
-        default_directory_name=f"{relative_path.name}-index",
-        targets=lambda students_root: _file_targets(students_root, relative_path),
+        source_description="selected files",
+        default_directory_name=(
+            "index" if multiple_files else f"{relative_paths[0].name}-index"
+        ),
+        targets=lambda students_root: [
+            target
+            for relative_path in relative_paths
+            for target in _file_targets(students_root, relative_path)
+        ],
         missing_message="run report first",
         name_mode=name_mode,
         include_extension=include_extension,
+        multiple_files=multiple_files,
+        group_by_submission=group_by_submission and multiple_files,
     )
 
 
@@ -161,6 +187,8 @@ def _create_index(
     missing_message: str,
     name_mode: str,
     include_extension: bool,
+    multiple_files: bool = False,
+    group_by_submission: bool = False,
 ) -> ReportIndexResult:
     """Create an owned symlink index from a workspace source.
 
@@ -173,6 +201,10 @@ def _create_index(
     :param name_mode: Use ``identifier`` or ``mapped`` for submission link
         names.
     :param include_extension: Append the original target extension when true.
+    :param multiple_files: Include each target's original filename in its link
+        name when indexing more than one requested path.
+    :param group_by_submission: Place multi-file links under submission
+        directories and use the original target filename for each link.
     :return: The index directory and the links created there.
     :raises FileNotFoundError: If the workspace or source directory is absent.
     :raises FileExistsError: If a real index entry would be overwritten.
@@ -204,7 +236,7 @@ def _create_index(
 
     # The index directory is owned by this command: stale symlinks are safe to
     # remove, while real files and directories are deliberately preserved.
-    for entry in index_directory.iterdir():
+    for entry in sorted(index_directory.rglob("*"), reverse=True):
         if entry.is_symlink():
             entry.unlink()
 
@@ -213,14 +245,25 @@ def _create_index(
     for name, target in report_targets:
         name = _index_entry_name(
             students_root, name, target, submission_names, name_mode,
-            include_extension,
+            include_extension, multiple_files, group_by_submission,
         )
-        link_path = index_directory / name
+        link_path = (
+            index_directory / name / target.name
+            if group_by_submission
+            else index_directory / name
+        )
+        if group_by_submission:
+            submission_directory = link_path.parent
+            if submission_directory.exists() and not submission_directory.is_dir():
+                raise FileExistsError(
+                    f"Cannot create submission directory '{submission_directory}'."
+                )
+            submission_directory.mkdir(parents=True, exist_ok=True)
         if link_path.exists() or link_path.is_symlink():
             raise FileExistsError(
                 f"Cannot replace existing non-symlink index entry '{link_path}'."
             )
-        relative_target = os.path.relpath(target, start=index_directory)
+        relative_target = os.path.relpath(target, start=link_path.parent)
         link_path.symlink_to(relative_target)
         links.append(link_path)
 
@@ -234,6 +277,8 @@ def _index_entry_name(
     submission_names: dict[str, str],
     name_mode: str,
     include_extension: bool,
+    multiple_files: bool = False,
+    group_by_submission: bool = False,
 ) -> str:
     """Build one symlink name from its submission and source extension.
 
@@ -243,6 +288,10 @@ def _index_entry_name(
     :param submission_names: Workspace mapping of identifiers to display names.
     :param name_mode: Select ``identifier`` or ``mapped`` naming.
     :param include_extension: Append the target suffix when true.
+    :param multiple_files: Include the target's original filename in the link
+        name when several paths are indexed together.
+    :param group_by_submission: Return the submission directory name without
+        a target filename when grouped links are requested.
     :return: Symlink filename, including the source extension when applicable.
     """
     try:
@@ -259,6 +308,10 @@ def _index_entry_name(
         base_name = identifier
     if not base_name:
         base_name = identifier
+    if group_by_submission:
+        return base_name
+    if multiple_files:
+        return f"{base_name}-{target.name}"
     return f"{base_name}{target.suffix}" if include_extension and target.suffix else base_name
 
 

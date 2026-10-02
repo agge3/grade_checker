@@ -122,6 +122,33 @@ class TeacherImportTests(unittest.TestCase):
         )
         create_index.assert_called_once_with("workspace", "notes.md", None)
 
+    @patch("main.create_file_index", return_value=ReportIndexResult(Path("index"), ()))
+    def test_generate_index_accepts_multiple_filepaths(self, create_index) -> None:
+        """Ensure repeated file options are passed to the index creator together."""
+        self.assertEqual(
+            main.generate_index([
+                "--workspace", "workspace", "--file", "notes.md",
+                "--file", "overrides.json",
+            ]), 0
+        )
+        create_index.assert_called_once_with(
+            "workspace", ["notes.md", "overrides.json"], None
+        )
+
+    @patch("main.create_file_index", return_value=ReportIndexResult(Path("index"), ()))
+    def test_generate_index_accepts_grouped_multiple_filepaths(self, create_index) -> None:
+        """Ensure grouped multi-file indexing reaches the index creator."""
+        self.assertEqual(
+            main.generate_index([
+                "--workspace", "workspace", "--file", "notes.md",
+                "--file", "overrides.json", "--group-by-submission",
+            ]), 0
+        )
+        create_index.assert_called_once_with(
+            "workspace", ["notes.md", "overrides.json"], None,
+            "identifier", False, True,
+        )
+
 
 class WorkspaceReportTests(unittest.TestCase):
     """Verify reporting prepares isolated teacher-template build workspaces."""
@@ -471,6 +498,64 @@ class ReportIndexTests(unittest.TestCase):
             self.assertEqual(
                 os.readlink(index / "student01"),
                 "../students/student01/uml-diagrams",
+            )
+
+    def test_file_index_distinguishes_multiple_requested_files(self) -> None:
+        """Ensure multiple requested files share an index without name collisions."""
+        from core.report_index import create_file_index
+
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "workspace"
+            student_directory = workspace / "students" / "student01"
+            student_directory.mkdir(parents=True)
+            (workspace / "workspace.json").write_text("{}", encoding="utf-8")
+            (student_directory / "notes.md").write_text("notes", encoding="utf-8")
+            (student_directory / "overrides.json").write_text("{}", encoding="utf-8")
+
+            result = create_file_index(
+                workspace, ["notes.md", "overrides.json"]
+            )
+
+            self.assertEqual(result.directory, workspace / "index")
+            self.assertEqual(
+                os.readlink(result.directory / "student01-notes.md"),
+                "../students/student01/notes.md",
+            )
+            self.assertEqual(
+                os.readlink(result.directory / "student01-overrides.json"),
+                "../students/student01/overrides.json",
+            )
+
+    def test_file_index_can_group_multiple_files_by_submission(self) -> None:
+        """Ensure grouped links use submission directories and original names."""
+        from core.report_index import create_file_index
+
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory) / "workspace"
+            student_directory = workspace / "students" / "student01"
+            student_directory.mkdir(parents=True)
+            (workspace / "workspace.json").write_text("{}", encoding="utf-8")
+            (student_directory / "notes.md").write_text("notes", encoding="utf-8")
+            (student_directory / "overrides.json").write_text("{}", encoding="utf-8")
+
+            result = create_file_index(
+                workspace, ["notes.md", "overrides.json"], group_by_submission=True
+            )
+
+            self.assertTrue((result.directory / "student01").is_dir())
+            self.assertEqual(
+                os.readlink(result.directory / "student01" / "notes.md"),
+                "../../students/student01/notes.md",
+            )
+            self.assertEqual(
+                os.readlink(result.directory / "student01" / "overrides.json"),
+                "../../students/student01/overrides.json",
+            )
+            self.assertEqual(
+                (result.directory / "student01" / "notes.md").read_text(
+                    encoding="utf-8"
+                ),
+                "notes",
             )
 
 

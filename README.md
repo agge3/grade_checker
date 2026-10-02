@@ -224,8 +224,8 @@ Use `--name-by mapped` to use `submission-identifiers.csv` display names for
 submission links. Add `--include-extension` to append the original target
 extension to each link name.
 
-The general index command accepts a file or directory path relative to each
-student's directory:
+The general index command accepts one or more file or directory paths relative
+to each student's directory:
 
 ```bash
 python3 main.py generate-index notes.md \
@@ -238,6 +238,15 @@ interactive command offers standard report files (`report.txt`, both logs,
 (such as `src-files/` and `uml-diagrams/`), and configured required student
 submission files. Required student files are linked from each student's
 `src-files/` directory.
+Repeat `--file` to index multiple paths in one directory. For a multi-file
+index, links use names such as `student01-notes.md` and
+`student01-overrides.json` so the targets remain distinct. The default output
+directory for a multi-file index is `index/`.
+Pass `--group-by-submission` to put those links under directories instead,
+such as `index/student01/notes.md` and `index/student01/overrides.json`.
+The directory name follows `--name-by identifier` or `--name-by mapped`.
+When selecting files interactively, grouping is asked in its own prompt before
+the mapped-name and extension options.
 All index commands accept `--name-by identifier` (the default) or
 `--name-by mapped`. Add `--include-extension` when link names should include
 the original target extension, such as `Ada Lovelace.cpp` or

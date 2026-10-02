@@ -842,11 +842,11 @@ def _index_file_choices(workspace: str | Path) -> list[str]:
     return list(dict.fromkeys(choices))
 
 
-def _select_index_file_interactively(workspace: str | Path) -> str:
-    """Ask which standard file or student directory should be indexed.
+def _select_index_file_interactively(workspace: str | Path) -> list[str]:
+    """Ask which standard files or student directories should be indexed.
 
     :param workspace: Initialized grading workspace to inspect.
-    :return: Selected filepath relative to each report directory.
+    :return: Selected filepaths relative to each report directory.
     :raises ValueError: If the prompt is cancelled or no file is selected.
     """
     choices = _index_file_choices(workspace)
@@ -855,21 +855,29 @@ def _select_index_file_interactively(workspace: str | Path) -> str:
     except ImportError:
         questionary = None
     if questionary is not None and sys.stdin.isatty() and sys.stdout.isatty():
-        selected = questionary.select("File or directory to index:", choices=choices).ask()
+        selected = questionary.checkbox(
+            "Files or directories to index (Space to toggle, Enter to continue):",
+            choices=choices,
+        ).ask()
         if selected is None:
             raise ValueError("File selection was cancelled.")
+        if not selected:
+            raise ValueError("At least one file must be selected.")
         return selected
-    print("Select a file or directory to index:")
+    print("Select one or more files or directories to index (comma-separated):")
     for index, choice in enumerate(choices, start=1):
         print(f"  {index}. {choice}")
-    selection = input("File number: ").strip()
+    selection = input("File number(s): ").strip()
     try:
-        selected_index = int(selection) - 1
+        selected_indices = [int(value.strip()) - 1 for value in selection.split(",")]
     except ValueError as error:
-        raise ValueError("File selection must be a number.") from error
-    if selected_index < 0 or selected_index >= len(choices):
+        raise ValueError("File selection must be comma-separated numbers.") from error
+    if not selected_indices or any(
+        selected_index < 0 or selected_index >= len(choices)
+        for selected_index in selected_indices
+    ):
         raise ValueError("File selection is out of range.")
-    return choices[selected_index]
+    return list(dict.fromkeys(choices[index] for index in selected_indices))
 
 
 def _index_parser() -> argparse.ArgumentParser:
@@ -879,19 +887,19 @@ def _index_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="Grade Checker generate-index",
-        description="Create a symlink index for one file from each submission.",
+        description="Create a symlink index for one or more files from each submission.",
     )
     parser.add_argument(
-        "filepath_arg", nargs="?",
-        help="File or directory path relative to each student directory; prompts if omitted",
+        "filepath_arg", nargs="*",
+        help="File or directory paths relative to each student directory; prompts if omitted",
     )
     parser.add_argument(
         "--workspace",
         help="Initialized grading workspace directory; prompts if omitted",
     )
     parser.add_argument(
-        "--file", "--filepath", dest="filepath",
-        help="Path relative to each report directory; prompts if omitted",
+        "--file", "--filepath", dest="filepaths", action="append",
+        help="Path relative to each report directory; repeat for multiple paths",
     )
     parser.add_argument(
         "--output",
@@ -907,6 +915,10 @@ def _index_parser() -> argparse.ArgumentParser:
         "--include-extension", action="store_true", default=None,
         help="Append each submission target's file extension to its link name",
     )
+    parser.add_argument(
+        "--group-by-submission", action="store_true", default=None,
+        help="Group multi-file links under identifier or mapped-name directories",
+    )
     return parser
 
 
@@ -918,19 +930,58 @@ def generate_index(arguments: Sequence[str]) -> int:
     """
     args = _index_parser().parse_args(list(arguments))
     workspace = args.workspace or _select_workspace_interactively()
-    filepath = args.filepath or args.filepath_arg or _select_index_file_interactively(workspace)
+    filepaths = args.filepaths or args.filepath_arg
+    selected_filepaths = filepaths or _select_index_file_interactively(workspace)
+    selected_filepaths = list(dict.fromkeys(selected_filepaths))
+    if not selected_filepaths:
+        raise ValueError("At least one file must be selected.")
+    filepath: str | list[str] = (
+        selected_filepaths[0]
+        if len(selected_filepaths) == 1
+        else selected_filepaths
+    )
+    group_by_submission = _resolve_index_grouping_option(
+        args.group_by_submission, len(selected_filepaths) > 1
+    )
     name_mode, include_extension = _resolve_index_naming_options(
         args.name_by, args.include_extension
     )
-    if name_mode == "identifier" and not include_extension:
+    if name_mode == "identifier" and not include_extension and not group_by_submission:
         result = create_file_index(workspace, filepath, args.output)
     else:
         result = create_file_index(
-            workspace, filepath, args.output, name_mode, include_extension
+            workspace, filepath, args.output, name_mode, include_extension,
+            group_by_submission,
         )
     print(f"Index: {result.directory}")
     print(f"Links created: {len(result.links)}")
     return 0
+
+
+def _resolve_index_grouping_option(
+    group_by_submission: bool | None, multiple_files: bool
+) -> bool:
+    """Resolve whether selected files should be grouped by submission.
+
+    :param group_by_submission: Explicit command-line choice, if provided.
+    :param multiple_files: Whether more than one filepath was selected.
+    :return: True when links should be grouped under submission directories.
+    :raises ValueError: If the interactive prompt is cancelled.
+    """
+    if not multiple_files or group_by_submission is not None:
+        return bool(group_by_submission)
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        return False
+    try:
+        import questionary
+    except ImportError:
+        return False
+    selected = questionary.confirm(
+        "Group selected files under submission directories?", default=False
+    ).ask()
+    if selected is None:
+        raise ValueError("Index grouping selection was cancelled.")
+    return bool(selected)
 
 
 def _resolve_index_naming_options(
