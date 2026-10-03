@@ -188,6 +188,12 @@ def _import_submissions_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional file allowed in submitted ZIPs; may be repeated",
     )
+    parser.add_argument(
+        "--submission",
+        action="append",
+        dest="submissions",
+        help="Submission name or identifier to import; may be repeated",
+    )
     return parser
 
 
@@ -219,6 +225,7 @@ def _print_import_command(
     student_canvas_submissions: str,
     required_files: list[str],
     optional_files: list[str],
+    submissions: list[str] | None = None,
 ) -> None:
     """Print a shell command equivalent to the completed import prompts.
 
@@ -226,6 +233,7 @@ def _print_import_command(
     :param student_canvas_submissions: Student-canvas-submissions ZIP path.
     :param required_files: Required student filenames accepted during import.
     :param optional_files: Optional filenames accepted during import.
+    :param submissions: Optional source names or identifiers selected for import.
     """
     command = [
         "python3",
@@ -240,6 +248,8 @@ def _print_import_command(
         command.extend(("--required-file", required_file))
     for optional_file in optional_files:
         command.extend(("--optional-file", optional_file))
+    for submission in submissions or []:
+        command.extend(("--submission", submission))
     print(f"Equivalent command: {shlex.join(command)}")
 
 
@@ -429,6 +439,53 @@ def _select_submission_numbers(
     return list(dict.fromkeys(submissions[index] for index in selected_indices))
 
 
+def _select_import_submissions(
+    submissions: list[str], questionary: object | None
+) -> list[str]:
+    """Prompt for the archive submissions that should be imported.
+
+    :param submissions: Source names discovered in the Canvas archive.
+    :param questionary: Loaded questionary module, or ``None`` when unavailable.
+    :return: Source names selected for import.
+    :raises ValueError: If the selection is cancelled or empty.
+    """
+    if not submissions:
+        raise ValueError("The student-canvas-submissions archive contains no submissions.")
+    if questionary is not None and sys.stdin.isatty() and sys.stdout.isatty():
+        import_all = questionary.confirm(
+            "Import all submissions?", default=True
+        ).ask()
+        if import_all is None:
+            raise ValueError("Submission selection was cancelled.")
+        if import_all:
+            return submissions
+        selected = questionary.checkbox(
+            "Select submissions to import:",
+            choices=[questionary.Choice(item, value=item) for item in submissions],
+        ).ask()
+        if selected is None:
+            raise ValueError("Submission selection was cancelled.")
+        if not selected:
+            raise ValueError("Select at least one submission to import.")
+        return selected
+    import_all = input("Import all submissions? [Y/n]: ").strip().lower()
+    if not import_all or import_all in {"y", "yes"}:
+        return submissions
+    print("Select submissions to import (comma-separated numbers):")
+    for index, submission in enumerate(submissions, start=1):
+        print(f"  {index}. {submission}")
+    selection = input("Submission numbers: ").strip()
+    if not selection:
+        raise ValueError("Select at least one submission to import.")
+    try:
+        selected_indices = [int(value.strip()) - 1 for value in selection.split(",")]
+    except ValueError as error:
+        raise ValueError("Submission selections must be numbers separated by commas.") from error
+    if any(index < 0 or index >= len(submissions) for index in selected_indices):
+        raise ValueError("Submission selection is out of range.")
+    return list(dict.fromkeys(submissions[index] for index in selected_indices))
+
+
 def import_submissions(arguments: Sequence[str]) -> int:
     """Import student-canvas-submissions into an initialized grading workspace.
 
@@ -517,6 +574,26 @@ def import_submissions(arguments: Sequence[str]) -> int:
             for item in optional_value.split(",")
             if _clean_entered_value(item)
         ] or ["README.md"]
+    importer = SubmissionImporter(
+        submissions_value,
+        workspace_root,
+        required_filename=required_file or None,
+        optional_filenames=optional_files,
+        required_filenames=required_files,
+        structured_submissions=structured_submissions,
+    )
+    selected_submissions = args.submissions
+    if selected_submissions is None and sys.stdin.isatty() and sys.stdout.isatty():
+        selected_submissions = _select_import_submissions(
+            importer.available_submissions(), questionary
+        )
+    if selected_submissions:
+        available = importer.available_submissions()
+        invalid = [item for item in selected_submissions if item not in available and importer._internal_name(item) not in available]
+        if invalid:
+            raise ValueError(
+                "Unknown submission selection(s): " + ", ".join(invalid)
+            )
     if not workspace_value or not submissions_value:
         raise ValueError("Workspace and student-canvas-submissions are required.")
     _print_import_command(
@@ -524,15 +601,18 @@ def import_submissions(arguments: Sequence[str]) -> int:
         submissions_value,
         required_files,
         optional_files,
+        selected_submissions,
     )
-    result = SubmissionImporter(
+    importer = SubmissionImporter(
         submissions_value,
         workspace_root,
         required_filename=required_file or None,
         optional_filenames=optional_files,
         required_filenames=required_files,
         structured_submissions=structured_submissions,
-    ).import_submissions()
+        selected_submissions=selected_submissions,
+    )
+    result = importer.import_submissions()
     _print_import_result(result)
     return 0
 

@@ -44,6 +44,8 @@ class SubmissionImporter:
     :param output_root: Directory receiving the raw archive and workspaces.
     :param required_filename: Student file expected by the milestone.
     :param optional_filenames: Files that may accompany the required file.
+    :param selected_submissions: Optional source names or normalized identifiers
+        to import; when omitted, every discovered submission is imported.
     """
 
     def __init__(
@@ -54,6 +56,7 @@ class SubmissionImporter:
         optional_filenames: Iterable[str] = ("README.md",),
         required_filenames: Iterable[str] | None = None,
         structured_submissions: bool = False,
+        selected_submissions: Iterable[str] | None = None,
     ) -> None:
         self.archive_path = Path(archive_path)
         self.output_root = Path(output_root)
@@ -63,9 +66,27 @@ class SubmissionImporter:
             required_filenames or ((required_filename,) if required_filename else ())
         )
         self.structured_submissions = structured_submissions
+        self.selected_submissions = frozenset(selected_submissions or ())
+
+    def available_submissions(self) -> list[str]:
+        """List source names that can be selected from the input archive.
+
+        :return: Sorted source names for the discoverable submissions.
+        :raises FileNotFoundError: If the input ZIP does not exist.
+        :raises ValueError: If the input is not a valid ZIP archive or contains
+            an unsafe member path.
+        """
+        if not self.archive_path.is_file():
+            raise FileNotFoundError(f"Student-canvas-submissions '{self.archive_path}' was not found.")
+        try:
+            with ZipFile(self.archive_path) as archive:
+                entries = self._safe_entries(archive)
+                return sorted(source_name for source_name, _ in self._discover_groups(entries))
+        except BadZipFile as error:
+            raise ValueError(f"Student-canvas-submissions '{self.archive_path}' is not a valid ZIP file.") from error
 
     def import_submissions(self) -> ImportResult:
-        """Import every discoverable submission from the configured ZIP.
+        """Import selected or all discoverable submissions from the ZIP.
 
         :return: Imported submissions plus warnings that require TA review.
         :raises FileNotFoundError: If the input ZIP does not exist.
@@ -86,6 +107,8 @@ class SubmissionImporter:
                 result = ImportResult(raw_archive=raw_archive)
                 names: dict[str, int] = {}
                 for source_name, members in groups:
+                    if self.selected_submissions and not self._is_selected(source_name):
+                        continue
                     submission = self._import_group(
                         archive, source_name, members, names
                     )
@@ -104,6 +127,15 @@ class SubmissionImporter:
                 return result
         except BadZipFile as error:
             raise ValueError(f"Student-canvas-submissions '{self.archive_path}' is not a valid ZIP file.") from error
+
+    def _is_selected(self, source_name: str) -> bool:
+        """Determine whether a discovered submission was requested.
+
+        :param source_name: Source name assigned during archive discovery.
+        :return: ``True`` when the source name or normalized identifier was
+            selected.
+        """
+        return source_name in self.selected_submissions or self._internal_name(source_name) in self.selected_submissions
 
     def _write_import_summary(self, result: ImportResult) -> Path:
         """Write a Markdown summary describing the completed import.

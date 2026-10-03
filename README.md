@@ -73,8 +73,8 @@ python3 main.py import-student-canvas-submissions
 ```
 
 The command prompts for the initialized workspace, the
-student-canvas-submissions ZIP, the required student filename, and optional
-files. `README.md` is the default optional file.
+student-canvas-submissions ZIP, the required student filename, optional files,
+and which submissions to import. `README.md` is the default optional file.
 
 After the prompts are complete, the CLI prints an equivalent shell command so
 the same import can be rerun quickly without interactive prompts.
@@ -90,8 +90,14 @@ For scripted use:
 python3 main.py import-student-canvas-submissions \
   --workspace grading-workspaces/milestone2 \
   --student-canvas-submissions student-canvas-submissions.zip \
-  --required-file milestone2.cpp
+  --required-file milestone2.cpp \
+  --submission student_123
 ```
+
+Repeat `--submission` to import several selected submissions. If the option is
+omitted in an interactive terminal, the importer first asks whether all
+submissions should be imported and displays a checklist only when the answer is
+no. Non-interactive runs continue to import all submissions by default.
 
 The importer is also available from Python as
 `core.submission_importer.SubmissionImporter`. It preserves the input ZIP under

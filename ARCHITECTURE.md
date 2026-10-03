@@ -185,7 +185,11 @@ provenance and warnings in `submission_metadata.json`. The importer supports
 direct Canvas files, flat student ZIPs, and the preferred ZIP layout with one
 top-level project directory. Source files and directly contained UML matches
 are imported separately, while each non-preferred layout remains flagged for
-manual review. macOS archive metadata is ignored before layout detection.
+manual review. Repeated `--submission` options filter discovered groups by
+source name or normalized identifier; interactive terminal runs first ask
+whether all groups should be imported and show a checklist only when needed,
+while non-interactive runs import every group by default. macOS archive
+metadata is ignored before layout detection.
 
 Milestone JSON files provide the application’s dependency-injection data. The
 loader maps their contents to the typed `ConfigData` structure:

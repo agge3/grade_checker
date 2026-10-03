@@ -153,6 +153,30 @@ class TeacherImportTests(unittest.TestCase):
 class WorkspaceReportTests(unittest.TestCase):
     """Verify reporting prepares isolated teacher-template build workspaces."""
 
+    def test_submission_import_can_select_one_archive_group(self) -> None:
+        """Ensure an explicit selection excludes other archive submissions."""
+        from core.submission_importer import SubmissionImporter
+        from zipfile import ZipFile
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace = root / "workspace"
+            archive_path = root / "submissions.zip"
+            with ZipFile(archive_path, "w") as archive:
+                archive.writestr("student_1_student.cpp", "one")
+                archive.writestr("student_2_student.cpp", "two")
+
+            result = SubmissionImporter(
+                archive_path,
+                workspace,
+                required_filename="student.cpp",
+                selected_submissions=["student_1"],
+            ).import_submissions()
+
+            self.assertEqual([item.identifier for item in result.submissions], ["student_1"])
+            self.assertTrue((workspace / "students/student_1/src-files/student.cpp").is_file())
+            self.assertFalse((workspace / "students/student_2").exists())
+
     def test_method_search_parses_cpp_structure(self) -> None:
         """Recognize flexible method syntax without matching comments or strings."""
         from core.workspace_reporter import WorkspaceReporter
