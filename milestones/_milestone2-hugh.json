@@ -98,6 +98,6 @@
 		"required_files": [
 			"hash_table.cpp"
 		],
-		"optional_files": []
+		"optional_files": ["README.md"]
 	}
 }
