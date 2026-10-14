@@ -2,9 +2,9 @@
 
 ## Versioning and changelogs
 
-The current application version is stored in [`VERSION`](VERSION). User-facing
-changes are tracked in [`CHANGELOG.md`](CHANGELOG.md) under `Unreleased` while
-development continues.
+The current application version is stored in [`VERSION`](VERSION); the current
+development line is v2.2. User-facing changes are tracked in
+[`CHANGELOG.md`](CHANGELOG.md) under `Unreleased` while development continues.
 
 The AI maintainer is expected to update the `Unreleased` changelog as part of
 normal work. It must ask before changing the application version or preparing a

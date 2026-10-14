@@ -67,6 +67,41 @@ and milestone configuration files under `milestones/`.
 - Keep scoring separate from report formatting.
 - Make report paths consistent with the repository input layout.
 
+## Versioning and changelog workflow
+
+- Treat `VERSION` as the single source of truth for the current application
+  version.
+- The project is currently on the v2.2 line. For historical classification,
+  v2.0 contains commits before
+  `5905f9d025fdc33a7f21d5ff437f78768270912f`, v2.1 contains that commit through
+  the commit before `2c315bda4c13a62924eb2c4c8bc75c4d47c2ec73`, and v2.2 starts
+  at `2c315bda4c13a62924eb2c4c8bc75c4d47c2ec73`.
+- Treat `CHANGELOG.md` as the running record of user-visible changes. Add
+  completed work to its `Unreleased` section during the same change that
+  introduces it.
+- Do not silently change `VERSION`, move entries out of `Unreleased`, or create
+  a release tag. At the end of a change that affects behavior, explicitly tell
+  the user the current version, summarize the pending unreleased changes, and
+  ask whether this is a good release point.
+- When the user approves a release, select the version from the overall impact
+  of the release rather than the order in which work was done:
+  - increment the major number for incompatible CLI, workspace, report, or
+    grading behavior;
+  - increment the minor number for a new feature or meaningful workflow
+    improvement;
+  - increment the patch number for corrections, documentation-only changes,
+    or internal changes that do not alter the user workflow.
+- If a release mixes feature work and bug fixes, use the highest applicable
+  impact (normally a minor release) and record both kinds of changes under
+  their appropriate changelog headings.
+- When a release is approved, update `VERSION`, move the `Unreleased` entries
+  into a dated version section, and recreate an empty `Unreleased` section.
+  Creating a Git tag remains a separate action that requires explicit user
+  approval.
+- Keep the existing `workspace_version` in `workspace.json` separate from the
+  application version. Change it only when the on-disk workspace schema
+  changes.
+
 ## Documentation conventions
 
 - Keep architecture documentation in `ARCHITECTURE.md`.
