@@ -79,5 +79,11 @@
 	],
 	"files": [
 		"milestone1.json"
-	]
+	],
+	"submission": {
+		"required_files": [
+			"doubly_linked_list.cpp"
+		],
+		"optional_files": ["README.md"]
+	}
 }
