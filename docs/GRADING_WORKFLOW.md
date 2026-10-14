@@ -126,13 +126,12 @@ not depend on understanding or perfectly parsing the Canvas-generated prefix.
 The student-supplied filename and extension are useful evidence, but the app
 still evaluates the extracted submission rather than identifying the student.
 
-For internal workspace naming, use the student's first name, last name, and
-the shared first Canvas-generated numeric value. Exclude the per-file second
-numeric value, the optional `[LATE]` marker, and a trailing duplicate-attempt
-suffix such as `-2`. The full original filename remains available in metadata
-and reports. If removing those markers produces a name collision, the
-application must report the collision and use a deterministic disambiguation
-that does not discard either submission.
+For internal workspace naming, use the student's name and the first
+Canvas-generated numeric value. Exclude all later numeric metadata, the
+optional `[LATE]` marker, and the uploaded filename. The full original
+filename remains available in metadata and reports. If removing those markers
+produces a name collision, the application must report the collision and use a
+deterministic disambiguation that does not discard either submission.
 
 Canvas's bulk export provides only the most recent submission. The grader
 should not imply that it has access to earlier attempts, even when the filename
@@ -166,18 +165,21 @@ the original archive.
 ## Intended TA workflow
 
 1. The TA invokes the application's workspace-creation CLI command.
-2. The application interactively prompts for the workspace directory and
-   optional milestone configuration, then creates the empty workspace layout
-   and writes its workspace configuration.
+2. The application interactively prompts for the workspace directory, an
+   optional student identifier CSV, and optional milestone configuration, then
+   creates the workspace layout and writes its workspace configuration. CSV
+   files directly under `grading-workspaces/` are offered through an
+   arrow-key selector; a selected file is recorded in `workspace.json` as the
+   external mapping source and is not copied into the workspace.
 3. The TA later supplies the student-canvas-submissions ZIP, teacher ZIP, template,
    reference solution, expected-output log, and grading spreadsheet through the
    import/setup workflow.
 4. The application validates and preserves the original inputs.
 5. The application discovers individual submissions and creates an isolated,
-   normalized workspace for each one. The submission's internal name uses the
-   shared first Canvas numeric value, excluding the per-file second numeric
-   value, the optional `[LATE]` marker, and the optional duplicate-attempt
-   suffix such as `-2`.
+   normalized workspace for each one. The submission's internal name contains
+   only the student name and the first Canvas numeric metadata value; the
+   optional `[LATE]` marker, later numeric values, and uploaded filename are
+   ignored.
 6. The application applies the assignment configuration and instructor-provided
    files, then runs the enabled checks.
 7. The application builds and, where applicable, executes each submission with
@@ -214,8 +216,8 @@ The application should explicitly handle:
 - Student files that were provided by the template versus files the student
   was expected to create or modify.
 - Duplicate or ambiguous submission filenames.
-- Internal-name collisions after removing `[LATE]` and duplicate-attempt
-  suffixes.
+- Internal-name collisions after removing `[LATE]`, later numeric metadata,
+  and uploaded filenames.
 - Extra submitted files, which should be reported to the TA and ignored by the
   normalized build unless an assignment-specific criterion explicitly uses
   them.

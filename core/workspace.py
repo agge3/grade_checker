@@ -6,9 +6,6 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
-from core.submission_names import sync_submission_names
-
-
 WORKSPACE_DIRECTORIES = (
     "raw",
     "students",
@@ -31,6 +28,7 @@ def create_workspace(
     root: str | Path,
     milestone: str | None = None,
     configuration_path: str | Path | None = None,
+    identifier_file: str | Path | None = None,
 ) -> Workspace:
     """Create an empty grading workspace and record its settings.
 
@@ -39,6 +37,9 @@ def create_workspace(
         workspace.
     :param configuration_path: Optional path to the milestone configuration
         file. It is stored as metadata and is not copied or modified.
+    :param identifier_file: Optional CSV containing student identifier mappings.
+        Its resolved path is recorded in ``workspace.json``; the file is not
+        copied into the workspace.
     :return: Description of the initialized workspace.
     :raises FileExistsError: If the workspace already has a configuration file.
     :raises OSError: If the directory structure cannot be created.
@@ -54,16 +55,24 @@ def create_workspace(
     for directory in WORKSPACE_DIRECTORIES:
         (workspace_root / directory).mkdir(exist_ok=True)
 
+    identifier_source: Path | None = None
+    if identifier_file is not None:
+        identifier_source = Path(identifier_file).expanduser().resolve()
+        if not identifier_source.is_file():
+            raise FileNotFoundError(
+                f"Student identifier file '{identifier_source}' was not found."
+            )
+
     metadata = {
         "workspace_version": 2,
         "milestone": milestone,
         "milestone_configuration": str(configuration_path)
         if configuration_path is not None
         else None,
+        "identifier_file": str(identifier_source) if identifier_source else None,
         "directories": {directory: directory for directory in WORKSPACE_DIRECTORIES},
     }
     with configuration_file.open("w", encoding="utf-8") as file:
         json.dump(metadata, file, indent=2)
         file.write("\n")
-    sync_submission_names(workspace_root, [])
     return Workspace(workspace_root, milestone, configuration_file)

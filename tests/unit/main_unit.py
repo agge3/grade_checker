@@ -20,12 +20,39 @@ class CreateWorkspaceTests(unittest.TestCase):
         """Ensure initialization creates directories and workspace metadata."""
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "workspace"
-            status = main.create_workspace(["--output", str(output)])
+            with patch("main._select_identifier_file_interactively", return_value=None):
+                status = main.create_workspace(["--output", str(output)])
             self.assertEqual(status, 0)
             for name in ("raw", "students", "build-workspaces", "runs", "references"):
                 self.assertTrue((output / name).is_dir())
             metadata = json.loads((output / "workspace.json").read_text(encoding="utf-8"))
             self.assertIsNone(metadata["milestone"])
+
+    @patch("builtins.input", return_value="")
+    def test_create_workspace_records_identifier_file_without_copying(self, input_mock) -> None:
+        """Ensure a supplied identifier mapping is recorded without copying it."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "workspace"
+            identifier_file = root / "students.csv"
+            identifier_file.write_text(
+                "submission_identifier,human_readable_name\n"
+                "Doe_123,Doe Jane\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                main.create_workspace([
+                    "--output", str(output),
+                    "--identifier-file", str(identifier_file),
+                ]),
+                0,
+            )
+
+            metadata = json.loads((output / "workspace.json").read_text(encoding="utf-8"))
+            self.assertEqual(metadata["identifier_file"], str(identifier_file.resolve()))
+            self.assertFalse((output / "submission-identifiers.csv").exists())
+            self.assertEqual(main.load_submission_names(output), {"Doe_123": "Doe Jane"})
 
     @patch("main.create_workspace", return_value=0)
     def test_main_dispatches_create_workspace(self, create_workspace) -> None:
@@ -176,6 +203,25 @@ class WorkspaceReportTests(unittest.TestCase):
             self.assertEqual([item.identifier for item in result.submissions], ["student_1"])
             self.assertTrue((workspace / "students/student_1/src-files/student.cpp").is_file())
             self.assertFalse((workspace / "students/student_2").exists())
+
+    def test_submission_identifier_ignores_late_and_later_metadata(self) -> None:
+        """Ensure identifiers retain only the student name and first number."""
+        from core.submission_importer import SubmissionImporter
+
+        importer = SubmissionImporter(
+            "submissions.zip",
+            "workspace",
+            required_filename="HashTable.cpp",
+        )
+
+        self.assertEqual(
+            importer._internal_name("Doe_Jane_123_456_[LATE]_HashTable.cpp"),
+            "Doe_Jane_123",
+        )
+        self.assertEqual(
+            importer._internal_name("Doe_Jane_[LATE]_123_456_HashTable.cpp"),
+            "Doe_Jane_123",
+        )
 
     def test_method_search_parses_cpp_structure(self) -> None:
         """Recognize flexible method syntax without matching comments or strings."""

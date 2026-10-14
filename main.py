@@ -24,7 +24,11 @@ from core.workspace import Workspace, create_workspace as initialize_workspace
 from core.submission_importer import ImportResult, SubmissionImporter
 from core.teacher_importer import TeacherImportResult, TeacherImporter
 from core.workspace_reporter import WorkspaceReportResult, WorkspaceReporter
-from core.submission_names import format_submission_label, load_submission_names
+from core.submission_names import (
+    SUBMISSION_NAMES_FILENAME,
+    format_submission_label,
+    load_submission_names,
+)
 from core.similarity import SimilarityAnalyzer, temporary_source_index
 from core.report_index import (
     create_buildtime_log_index,
@@ -97,6 +101,11 @@ def _create_workspace_parser() -> argparse.ArgumentParser:
         "--milestone",
         help="Milestone configuration name to use instead of prompting",
     )
+    parser.add_argument(
+        "--identifier-file", "--student-identifier-file",
+        dest="identifier_file",
+        help="Student identifier CSV to record without copying",
+    )
     return parser
 
 
@@ -140,6 +149,11 @@ def create_workspace(arguments: Sequence[str]) -> int:
     else:
         workspace_name = input("Workspace name [grading-workspace]: ").strip()
         output = _interactive_workspace_path(workspace_name or "grading-workspace")
+    identifier_file = (
+        _clean_entered_value(args.identifier_file)
+        if args.identifier_file
+        else _select_identifier_file_interactively()
+    )
     milestone = args.milestone or input(
         "Milestone configuration (optional): "
     ).strip() or None
@@ -151,10 +165,17 @@ def create_workspace(arguments: Sequence[str]) -> int:
             / "milestones"
             / f"_{milestone}.json"
         )
+    if identifier_file:
+        print(
+            f"Student identifier file '{Path(identifier_file).expanduser()}' "
+            f"will be recorded in '{output / 'workspace.json'}'; "
+            "the source file will not be copied."
+        )
     workspace = initialize_workspace(
         output,
         milestone=milestone,
         configuration_path=configuration_path,
+        identifier_file=identifier_file,
     )
     _print_workspace_result(workspace)
     return 0
@@ -296,6 +317,135 @@ def _custom_workspace_path() -> str:
     if answer is None:
         raise ValueError("Workspace path prompt was cancelled.")
     return _clean_entered_value(answer)
+
+
+def _existing_identifier_files() -> list[Path]:
+    """Find candidate student identifier files in the default collection.
+
+    :return: Sorted CSV files directly inside ``grading-workspaces``.
+    """
+    workspace_root = Path.cwd() / "grading-workspaces"
+    if not workspace_root.is_dir():
+        return []
+    return sorted(
+        (
+            path for path in workspace_root.iterdir()
+            if path.is_file() and path.suffix.lower() == ".csv"
+        ),
+        key=lambda path: (
+            path.name != SUBMISSION_NAMES_FILENAME,
+            path.name.casefold(),
+        ),
+    )
+
+
+def _custom_identifier_file() -> str | None:
+    """Prompt for an optional student identifier mapping file.
+
+    :return: Entered file path, or ``None`` when no file is selected.
+    :raises ValueError: If the interactive prompt is cancelled.
+    """
+    prompt = "Student identifier CSV (optional): "
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        answer = _clean_entered_value(input(prompt))
+        return answer or None
+    try:
+        import questionary
+    except ImportError:
+        answer = _clean_entered_value(input(prompt))
+        return answer or None
+    answer = questionary.path(prompt).ask()
+    if answer is None:
+        raise ValueError("Student identifier file prompt was cancelled.")
+    answer = _clean_entered_value(answer)
+    return answer or None
+
+
+def _select_identifier_file_interactively() -> str | None:
+    """Choose an optional identifier file for a new workspace.
+
+    Existing CSV files in the default workspace collection are presented in a
+    keyboard-navigable list when the command runs in a terminal. Users may
+    enter a different path or continue without a mapping file.
+
+    :return: Selected file path, or ``None`` when no mapping is desired.
+    :raises ValueError: If the selection is cancelled or invalid.
+    """
+    candidates = _existing_identifier_files()
+    custom_label = "Enter a different identifier file"
+    none_label = "Do not use an identifier file"
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        if candidates:
+            print("Select a student identifier file (optional):")
+            for index, candidate in enumerate(candidates, start=1):
+                print(f"  {index}. {candidate}")
+            print(f"  {len(candidates) + 1}. {custom_label}")
+            print(f"  {len(candidates) + 2}. {none_label}")
+            selection = input("Identifier file number [1]: ").strip()
+            if not selection:
+                return str(candidates[0])
+            try:
+                selected_index = int(selection) - 1
+            except ValueError as error:
+                raise ValueError("Identifier file selection must be a number.") from error
+            if 0 <= selected_index < len(candidates):
+                return str(candidates[selected_index])
+            if selected_index == len(candidates):
+                return _custom_identifier_file()
+            if selected_index == len(candidates) + 1:
+                return None
+            raise ValueError("Identifier file selection is out of range.")
+        return _custom_identifier_file()
+
+    try:
+        import questionary
+    except ImportError:
+        return _select_identifier_file_numbered(candidates)
+
+    choices = [str(candidate) for candidate in candidates]
+    choices.extend((custom_label, none_label))
+    selected = questionary.select(
+        "Select a student identifier file (optional):",
+        choices=choices,
+        default=(str(candidates[0]) if candidates else none_label),
+    ).ask()
+    if selected is None:
+        raise ValueError("Student identifier file selection was cancelled.")
+    if selected == custom_label:
+        return _custom_identifier_file()
+    if selected == none_label:
+        return None
+    return selected
+
+
+def _select_identifier_file_numbered(candidates: list[Path]) -> str | None:
+    """Select an identifier file using a non-interactive fallback prompt.
+
+    :param candidates: Existing CSV files offered from the default collection.
+    :return: Selected file path, or ``None`` when no file is selected.
+    :raises ValueError: If the selection is not a valid option.
+    """
+    if not candidates:
+        return _custom_identifier_file()
+    print("Select a student identifier file (optional):")
+    for index, candidate in enumerate(candidates, start=1):
+        print(f"  {index}. {candidate}")
+    print(f"  {len(candidates) + 1}. Enter a different identifier file")
+    print(f"  {len(candidates) + 2}. Do not use an identifier file")
+    selection = input("Identifier file number [1]: ").strip()
+    if not selection:
+        return str(candidates[0])
+    try:
+        selected_index = int(selection) - 1
+    except ValueError as error:
+        raise ValueError("Identifier file selection must be a number.") from error
+    if 0 <= selected_index < len(candidates):
+        return str(candidates[selected_index])
+    if selected_index == len(candidates):
+        return _custom_identifier_file()
+    if selected_index == len(candidates) + 1:
+        return None
+    raise ValueError("Identifier file selection is out of range.")
 
 
 def _select_workspace_numbered(options: list[Path | str]) -> str:

@@ -1,5 +1,19 @@
 # Grade Checker
 
+## Versioning and changelogs
+
+The current application version is stored in [`VERSION`](VERSION). User-facing
+changes are tracked in [`CHANGELOG.md`](CHANGELOG.md) under `Unreleased` while
+development continues.
+
+The AI maintainer is expected to update the `Unreleased` changelog as part of
+normal work. It must ask before changing the application version or preparing a
+numbered release. A release may contain features and bug fixes together; the
+version reflects the largest user-facing impact of the combined changes.
+
+The `workspace_version` value in generated `workspace.json` files is separate
+and changes only when the workspace file layout or metadata schema changes.
+
 ## Usage
 ### Setup:
 #### python
@@ -55,6 +69,23 @@ Initialize an empty grading workspace interactively:
 ```bash
 python3 main.py create-workspace
 ```
+
+During interactive creation, CSV files found directly in
+`grading-workspaces/` are offered with an arrow-key selector. You can choose a
+default, enter another file, or continue without a mapping. A selected file
+is recorded as the workspace's external mapping source; it is not copied into
+the workspace. For scripted creation, provide it explicitly:
+
+```bash
+python3 main.py create-workspace \
+  --output grading-workspaces/milestone2 \
+  --identifier-file student-identifiers.csv
+```
+
+The identifier file must have the columns
+`submission_identifier,human_readable_name`. The source path is recorded in
+`workspace.json`, so moving or deleting the source file requires updating the
+workspace configuration or recreating the workspace.
 
 For scripted use, provide the values as options:
 
@@ -127,19 +158,23 @@ Each import also writes `import-summary.md` at the workspace root. The summary
 lists the import status, required-file counts, UML status, copied-file counts,
 and manual-review warnings for every submission.
 
-The workspace also contains `submission-identifiers.csv` with the columns
+The workspace may use an external identifier mapping with the columns
 `submission_identifier,human_readable_name`. Fill in the second column to give
-submissions readable names. The Canvas-generated identifier remains the stable
-directory and command-line key, while user-facing import and reporting output
-uses the readable name when available.
+submissions readable names. The selected source path is recorded in
+`workspace.json`; the mapping file itself is not copied. Existing workspaces
+with a local `submission-identifiers.csv` continue to work. The Canvas-
+generated identifier remains the stable directory and command-line key, while
+user-facing import and reporting output uses the readable name when available.
 
 Legacy milestones continue to support the existing single-file recovery path.
 
 When Canvas exports multiple files submitted by the same student, the importer
 groups files with the same Canvas-generated metadata prefix into one normalized
-submission workspace. The required file and allowed optional files are copied
-there; other files are retained in the source metadata and reported as
-warnings.
+submission workspace. Internal identifiers contain only the student name and
+the first numeric Canvas metadata component. The optional `[LATE]` marker,
+per-file numeric metadata, and uploaded filename are ignored for that
+identifier. The required file and allowed optional files are copied there;
+other files are retained in the source metadata and reported as warnings.
 
 When reporting runs, each submission receives an isolated directory under
 `build-workspaces/`. The teacher template is copied there first and the

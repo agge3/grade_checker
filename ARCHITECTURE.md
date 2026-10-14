@@ -48,7 +48,10 @@ The interactive `create-workspace` command initializes an empty grading
 workspace below the application root's `grading-workspaces/` directory. It
 creates `raw/`, `students/`, `build-workspaces/`, `runs/`, and
 `references/`, then records the selected milestone and directory mapping in
-`workspace.json`. Student-canvas-submissions import and normalization are separate
+`workspace.json`. CSV identifier mappings in the default
+`grading-workspaces/` directory, or a custom path, can be selected during
+creation and are recorded as the workspace's external mapping source; the
+mapping file is not copied. Student-canvas-submissions import and normalization are separate
 operations handled later by `core.submission_importer`.
 
 The `import-student-canvas-submissions` command requires an initialized
@@ -63,9 +66,15 @@ submission rules are optional milestone configuration under
 also writes the workspace-level `import-summary.md` with per-submission import
 statuses and manual-review warnings; the reporting workflow continues to own
 `report-summary.md`. The workspace also contains the user-editable
-`submission-identifiers.csv` mapping from stable submission identifiers to
-optional human-readable names. Stable identifiers remain directory and
-command-line keys, while user-facing output uses mapped names when available.
+external identifier mapping from stable submission identifiers to optional
+human-readable names. The mapping source path is recorded in `workspace.json`
+and is read directly; existing workspaces with a local
+`submission-identifiers.csv` remain supported. Stable identifiers remain
+directory and command-line keys, while user-facing output uses mapped names
+when available.
+Canvas-derived stable identifiers retain only the student name and first
+numeric metadata component; `[LATE]`, later numeric metadata, and the uploaded
+filename are not part of the identifier.
 
 When reporting runs, `WorkspaceReporter` creates an isolated
 `build-workspaces/{identifier}/` directory. It copies the imported teacher
